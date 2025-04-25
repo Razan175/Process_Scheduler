@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
             i++;
         }
     }
-
+// ask belal
     if (process_count > 0) {
         total_runtime += processes[0].arrival_time;
     }
@@ -127,7 +127,7 @@ int main(int argc, char* argv[]) {
     initClk();
 
     char process_count_str[10];
-    sprintf(process_count_str, "%d", process_count);
+    sprintf(process_count_str, "%d", process_count); //copy any thing to string 
 
     scheduler_pid = fork();
     if (scheduler_pid == 0) {
@@ -138,9 +138,9 @@ int main(int argc, char* argv[]) {
         perror("Scheduler execution failed");
         exit(EXIT_FAILURE);
     }
-
+// need to change ipc_private
     // Step 5: Message queue setup  
-    msgQid = msgget(MSQKEY, 0666 | IPC_CREAT);
+    msgQid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
     if (msgQid == -1) {
         perror("Failed to create message queue");
         free(processes);
