@@ -4,7 +4,16 @@
 #include <stdbool.h>
 #ifndef Engine
 #define Engine
-// Define process structure
+
+
+
+enum state
+{
+    ready,
+    running,
+    finished
+};
+
 typedef struct Process {
     int id;
     int arrival_time;
@@ -12,7 +21,29 @@ typedef struct Process {
     int priority;
     bool prempted;
     int memsize;
+    enum state processstate;
+
 } Process;
+
+struct msgbuff {
+    Process* p;
+}msgbuff;
+
+  
+//Process Control Block
+struct PCB
+{
+    Process p;
+    int remainingtime;
+    int waitingtime;
+    int executiontime;
+    int finishedtime;
+    int current_pid;
+    int paused;
+    int oldtime;
+}PCB;     
+
+// Define process structure
 
 // Circular Queue Implementation
 typedef struct CircularQueue {

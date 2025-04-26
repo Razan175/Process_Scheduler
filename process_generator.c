@@ -22,6 +22,7 @@ int scheduler_pid;
 int clk_pid;
 int CompletedByScheduler = 0;
 
+
 int main(int argc, char* argv[]) {
 
     // ✅ Validate input arguments
@@ -90,22 +91,28 @@ int main(int argc, char* argv[]) {
         if (line[0] == '#')
             continue;
 
-        if (sscanf(line, "%d\t%d\t%d\t%d\t%d", 
+        if (sscanf(line, "%d\t%d\t%d\t%d", 
                    &processes[i].id, 
                    &processes[i].arrival_time, 
                    &processes[i].runtime, 
-                   &processes[i].priority,
-                   &processes[i].memsize) == 5) 
+                   &processes[i].priority) == 4) 
         {
             processes[i].prempted = false;
             total_runtime += processes[i].runtime;
             i++;
         }
+        printf("%d\t%d\t%d\t%d\t", 
+                   processes[i - 1].id, 
+                   processes[i - 1].arrival_time, 
+                   processes[i - 1].runtime, 
+                   processes[i - 1].priority);
+                printf("\n");
+
     }
-// ask belal
-    if (process_count > 0) {
-        total_runtime += processes[0].arrival_time;
-    }
+
+    //if (process_count > 0) {
+      //  total_runtime += processes[0].arrival_time;
+    //}
 
     free(line);
     fclose(file);
@@ -140,7 +147,8 @@ int main(int argc, char* argv[]) {
     }
 // need to change ipc_private
     // Step 5: Message queue setup  
-    msgQid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
+    key_t msgkey = ftok("keyfile",'p');
+    msgQid = msgget(msgkey, 0666 | IPC_CREAT);
     if (msgQid == -1) {
         perror("Failed to create message queue");
         free(processes);
@@ -148,16 +156,15 @@ int main(int argc, char* argv[]) {
         destroyClk(true);
         return EXIT_FAILURE;
     }
+
     
     // Step 6: Send processes to the scheduler at the appropriate time
-    for (int t = 0, sent = 0; sent < process_count; t++) {
+    /*for (int t = 0, sent = 0; sent < process_count; t++) {
         while (getClk() < t); // Wait for clock sync
 
         for (int j = 0; j < process_count; j++) {
             if (processes[j].arrival_time == t) {
-                struct msgbuff {
-                    Process p;
-                } newMessage;
+                
                 newMessage.p = processes[j];
 
                 if (msgsnd(msgQid, &newMessage, sizeof(newMessage), 0) == -1) {
@@ -169,11 +176,35 @@ int main(int argc, char* argv[]) {
             }
         }
     }
+*/
+    // Step 6: Send processes to the scheduler at the appropriate time
+    for (int i = 0; i < process_count; i++)
+    {
+        while( processes[i].arrival_time != getClk());
+        struct msgbuff msg;
+        msg.p = &processes[i];
+        if(msgsnd(msgQid,&msg,sizeof(msg.p),!IPC_NOWAIT) == -1)
+        {
+            perror("Error sending process to scheduler");
+        } else {
+            printf("Sent Process %d to scheduler at time %d\n", processes[i].id,getClk());
+        }
+
+    }
+    /*
+    for each proces
+        1-while(scan arrival time[i] != getclk());
+        2-send in msgqueue
+        3-printf proccess sent at time t
+    */
 
     while (CompletedByScheduler < process_count) {}
 
     printf("All processes have been sent and completed!\nShutting down Process Generator and Scheduler.\n");
     raise(SIGINT);
+    
+
+
     return EXIT_SUCCESS;
 }
 
@@ -199,4 +230,5 @@ void clearResources(int signum)
 void ProcessCompleted(int signum)
 {
     CompletedByScheduler++;
+    printf("sigusr1 received\n");
 }

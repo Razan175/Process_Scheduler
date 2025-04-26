@@ -21,24 +21,6 @@ typedef short bool;
 //don't mess with this variable//
 int *shmaddr; //
 //===============================
-enum state
-   {
-    ready,
-    running,
-   };
-  
-  
-struct PCB
-{
- enum state processstate;
- int remainingtime;
- int waitingtime;
- int executiontime;
- int finishedtime;
- int current_pid;
- int paused ;
- int oldtime ;
-}PCB;     
 
 int getClk()
 {
