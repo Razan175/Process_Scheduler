@@ -34,13 +34,17 @@ void handle_cont(int sig)
     printf("Process %d resumed.\n", current_pid);
 }
 
-
+void handler_done(int sig_num)
+{
+    /*raise sigusr1*/
+    kill(getppid(),SIGUSR1);
+}
 int main(int argc, char *argv[]) {
     // Signal handling
     signal(SIGSTOP, handle_stop);
     signal(SIGTSTP,handle_stop2);
     signal(SIGCONT, handle_cont);
-    
+    signal(SIGINT,handler_done);
     current_pid = getpid();
     initClk();
     
@@ -65,7 +69,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    
+    raise(SIGINT);
     destroyClk(false);
     return 0;
 }
