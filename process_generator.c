@@ -25,7 +25,7 @@ int CompletedByScheduler = 0;
 
 int main(int argc, char* argv[]) {
 
-    // ✅ Validate input arguments
+    // Validate input arguments
     if (argc < 3) {
         fprintf(stderr, "Usage: %s <processes_file> <algorithm_number> [quantum]\n", argv[0]);
         return EXIT_FAILURE;
@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
 
     
     // Step 6: Send processes to the scheduler at the appropriate time
-    /*for (int t = 0, sent = 0; sent < process_count; t++) {
+    /**    for (int t = 0, sent = 0; sent < process_count; t++) {
         while (getClk() < t); // Wait for clock sync
 
         for (int j = 0; j < process_count; j++) {
@@ -177,13 +177,14 @@ int main(int argc, char* argv[]) {
         }
     }
 */
+//struct msgbuff msg;
     // Step 6: Send processes to the scheduler at the appropriate time
     for (int i = 0; i < process_count; i++)
     {
         while( processes[i].arrival_time != getClk());
-        struct msgbuff msg;
-        msg.p = &processes[i];
-        if(msgsnd(msgQid,&msg,sizeof(msg.p),!IPC_NOWAIT) == -1)
+
+        newMessage.p = processes[i];
+        if(msgsnd(msgQid,&newMessage,sizeof(newMessage.p),IPC_NOWAIT) == -1)
         {
             perror("Error sending process to scheduler");
         } else {
@@ -191,6 +192,7 @@ int main(int argc, char* argv[]) {
         }
 
     }
+        
     /*
     for each proces
         1-while(scan arrival time[i] != getclk());

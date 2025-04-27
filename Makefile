@@ -4,13 +4,10 @@ build:
 	gcc scheduler.c -o scheduler.out
 	gcc process.c -o process.out
 	gcc test_generator.c -o test_generator.out
-	gcc RR.c -o RR.out
-	gcc SRTN.c -o SRTN.out
-
 clean:
 	rm -f *.out  processes.txt
 
 all: clean build
 
 run:
-	./process_generator.out
+	./process_generator.out processes.txt 3

@@ -5,8 +5,6 @@
 #ifndef Engine
 #define Engine
 
-
-
 enum state
 {
     ready,
@@ -26,10 +24,15 @@ typedef struct Process {
 } Process;
 
 struct msgbuff {
-    Process* p;
-}msgbuff;
+    Process p;
+}newMessage;
 
-  
+  /*
+  1-utilization
+  2-average weighted turnaround = (finishedtime - response time)/runtime
+  3-average wait time = response - arrival?
+  4-standard deviation of avergae weighted turnaround
+  */
 //Process Control Block
 struct PCB
 {
@@ -38,9 +41,10 @@ struct PCB
     int waitingtime;
     int executiontime;
     int finishedtime;
-    int current_pid;
+    int current_pid; //??
     int paused;
     int oldtime;
+    enum state processstate;
 }PCB;     
 
 // Define process structure
@@ -206,6 +210,7 @@ void insertPriorityPriorityQueue(PriorityQueue* pq, Process process) {
         return;
     }
     pq->array[pq->size] = process;
+    pq->array[pq->size].processstate = ready;
     heapifyUpPriority(pq, pq->size);
     pq->size++;
 }
