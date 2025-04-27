@@ -34,31 +34,37 @@ void handle_cont(int sig)
     printf("Process %d resumed.\n", current_pid);
 }
 
+int id;
+
 void handler_done(int sig_num)
 {
-    /*raise sigusr1*/
-    kill(getppid(),SIGUSR1);
+    destroyClk(false);
+    exit(id);
 }
 int main(int argc, char *argv[]) {
     // Signal handling
+
     signal(SIGSTOP, handle_stop);
     signal(SIGTSTP,handle_stop2);
     signal(SIGCONT, handle_cont);
     signal(SIGINT,handler_done);
+
     current_pid = getpid();
-    initClk();
-    
+   
+
     remainingtime = atoi(argv[1]);
+    id = atoi(argv[2]);
     //int algo = atoi(argv[2]);
     //quantum = (argc > 3) ? atoi(argv[3]) : 1;
     
-    printf("Process %d started with remaining time: %d\n", current_pid, remainingtime);
+    printf("Process %d started with remaining time: %d\n", id, remainingtime);
     
+    initClk();
     while (remainingtime > 0) {
         if (!paused) {
             // Simulate work
             //sleep(1);
-            oldtime=remainingtime;
+            oldtime = remainingtime;
             int current_time = getClk();
             
             remainingtime--;
