@@ -55,7 +55,6 @@ void HPF(int process_count)
 
     pcb = (struct PCB*)malloc(sizeof(PCB) * process_count);
     int pid;
-
     initClk();
     while(completed < process_count)
     {
@@ -97,6 +96,7 @@ void HPF(int process_count)
         {
             perror("Error receiveing process to scheduler");
         }
+
     }
 
     free(pcb);
@@ -118,13 +118,21 @@ void HPFhandler(int sig_num)
 //////////////////////////////////// Round Robin ///////////////////////////////////////////////////////
 void RR(int process_count, int quantum)
 {
-
 }
 
 
 //////////////////////////////////// Shortest Remaining Time Next //////////////////////////////////////
 void SRTN(int process_count)
 {
+    /*
+        1- read msg queue
+        2- add process to priority queue
+        3- each second, the process sends a signal to decrement its remaining time
+        4- check if the process at the face of the queue is the same as the currently running process 
+            -if no, pause this process and save its pid somehow (we can add a pid to PCB)
+        5- when a process is done, remove it from the queue and go to the next process
+        6- if the next process was never forked before, fork it, else resume it
+    */
 }
 
 //argv contains: algorithm number, process_count_str(idk what that is), quantum if exists
