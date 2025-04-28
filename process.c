@@ -69,6 +69,7 @@ int main(int argc, char *argv[]) {
             
             remainingtime--;
             printf("Process %d remaining time: %d\n", current_pid, remainingtime);
+            
             while (getClk() < current_time + 1)
             {
                 // absolute cinema
