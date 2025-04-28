@@ -102,6 +102,7 @@ Process dequeueCircularQueue(CircularQueue* queue) {
     return process;
 }
 
+
 // Priority Queue Functions
 PriorityQueue* createPriorityQueue(int capacity) {
     PriorityQueue* pq = (PriorityQueue*)malloc(sizeof(PriorityQueue));
@@ -255,5 +256,14 @@ void destroyPriorityQueue(PriorityQueue* pq) {
         free(pq);
     }
 }
+void destroyCircularQueue(CircularQueue* queue) {
+    if (queue != NULL) {
+        if (queue->array != NULL) {
+            free(queue->array);
+        }
+        free(queue);
+    }
+}
+
 #endif
       
