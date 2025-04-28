@@ -13,7 +13,14 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
     initClk();
 
     signal(SIGCHLD,HPFhandler);  
-    
+    FILE *logFile = fopen("scheduler.log", "w");
+    FILE *perfFile = fopen("scheduler.perf", "w");
+
+if (logFile == NULL || perfFile == NULL) {
+    perror("Error opening output files");
+    exit(1);
+}
+
     
     int algo = atoi(argv[1]);
 
@@ -30,7 +37,9 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
         default:
             return EXIT_FAILURE;
     }
-    destroyClk(false);
+fclose(logFile);
+fclose(perfFile);
+
 }
 
 ////////////////////////////////////////// Highest Priority first ////////////////////////////////////////
@@ -191,6 +200,9 @@ int RR_pid = -1;
                 
                 RR_pid = fork();
                 if (RR_pid == 0) {
+                    /*fprintf(logFile, "At time %d process %d resumed arr %d total %d remain %d wait %d\n",
+                        getClk(), RR_pcbidx, RR_pcb[RR_pcbidx].p.arrival_time, RR_pcb[RR_pcbidx].finishedtime, RR_pcb[RR_pcbidx].remainingtime, RR_pcb[RR_pcbidx].waitingtime);
+                    */
                     char rt[10], id[10];
                     sprintf(rt, "%d", RR_pcb[RR_pcbidx].remainingtime);
                     sprintf(id, "%d", RR_runningProcess.id);
@@ -306,3 +318,5 @@ void SRTN(int process_count)
         -generate output file
     */
    //struct msgbuff newMessage;
+
+
