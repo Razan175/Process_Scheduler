@@ -101,18 +101,11 @@ int main(int argc, char* argv[]) {
             total_runtime += processes[i].runtime;
             i++;
         }
-        printf("%d\t%d\t%d\t%d\t", 
-                   processes[i - 1].id, 
-                   processes[i - 1].arrival_time, 
-                   processes[i - 1].runtime, 
-                   processes[i - 1].priority);
-                printf("\n");
-
     }
 
-    //if (process_count > 0) {
-      //  total_runtime += processes[0].arrival_time;
-    //}
+    if (process_count > 0) {
+        total_runtime += processes[0].arrival_time;
+    }
 
     free(line);
     fclose(file);
@@ -123,15 +116,7 @@ int main(int argc, char* argv[]) {
     if (argc > 3)
         sprintf(quantum_str, "%d", atoi(argv[3]));
 
-    clk_pid = fork();
-    if (clk_pid == 0) {
-        execl("./clk.out", "./clk.out", NULL);
-        perror("Clock execution failed");
-        exit(EXIT_FAILURE);
-    }
 
-    sleep(1);
-    initClk();
 
     char process_count_str[10];
     sprintf(process_count_str, "%d", process_count); //copy any thing to string 
@@ -178,10 +163,19 @@ int main(int argc, char* argv[]) {
     }
 */
 //struct msgbuff msg;
+    clk_pid = fork();
+    if (clk_pid == 0) {
+        execl("./clk.out", "./clk.out", NULL);
+        perror("Clock execution failed");
+        exit(EXIT_FAILURE);
+    }
+
+    sleep(1);
+    initClk();
     // Step 6: Send processes to the scheduler at the appropriate time
     for (int i = 0; i < process_count; i++)
     {
-        while( processes[i].arrival_time != getClk());
+        while(processes[i].arrival_time > getClk());
 
         newMessage.p = processes[i];
         if(msgsnd(msgQid,&newMessage,sizeof(newMessage.p),IPC_NOWAIT) == -1)
@@ -219,7 +213,7 @@ void clearResources(int signum)
     if (File_name)
         free(File_name);
 
-    kill(scheduler_pid, SIGINT);
+    //kill(scheduler_pid, SIGINT);
     int status;
     waitpid(scheduler_pid, &status, 0);
 

@@ -11,9 +11,9 @@ void handle_stop(int sig)
     paused = 1;
     
     printf("Process %d paused.\n", current_pid);
-    while (paused) {
+    //while (paused) {
         //sleep(1);  // Sleep while paused to simulate a halt
-    }
+   // }
    
 }
 
@@ -60,20 +60,25 @@ int main(int argc, char *argv[]) {
     printf("Process %d started with remaining time: %d\n", id, remainingtime);
     
     initClk();
+    int t = getClk() + 1;
     while (remainingtime > 0) {
-        if (!paused) {
+        //if (!paused)
+         {
             // Simulate work
-            //sleep(1);
-            oldtime = remainingtime;
-            int current_time = getClk();
+            sleep(1);
+            //while (t > getClk());
+            //t++;
+            //oldtime = remainingtime;
+            //int current_time = getClk();
             
             remainingtime--;
-            printf("Process %d remaining time: %d\n", current_pid, remainingtime);
+            printf("Process %d remaining time: %d current time: %d\n", current_pid, remainingtime, getClk());
             
-            while (getClk() < current_time + 1)
-            {
+            //while (getClk() < current_time + 1)
+            //{
                 // absolute cinema
-            }
+            //}
+            
         }
     }
     raise(SIGINT);

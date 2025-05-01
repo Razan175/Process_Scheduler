@@ -9,6 +9,8 @@ enum state
 {
     ready,
     running,
+    stopped,
+    resumed,
     finished
 };
 
@@ -41,9 +43,10 @@ struct PCB
     int waitingtime;
     int executiontime;
     int finishedtime;
-    int current_pid; //??
+    int current_pid; 
     int paused;
-    int oldtime;
+    double TA;
+    double WTA;
     enum state processstate;
 }PCB;     
 
