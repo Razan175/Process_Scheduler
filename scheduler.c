@@ -1,18 +1,20 @@
 #include <math.h>
 #include "headers.h"
 #include "Defined_DS.h"
-
+// -------------------Closing the scheduler---------------------
 void closeScheduler(int sig_num);
+// -------------------  Output file functions-------------------
 void addToLog(int clk, int process_id,enum state state_num, int arrival,int runtime, int remaining_time, int wait_time,double TA, double WTA);
 void addToPerf(struct PCB* pcb, int process_count);
+// -------------------  HPF functions---------------------------
 void HPF(int process_count);
 void HPFhandler(int sig_num);
-
+// -------------------  Round Robin functions-------------------
 void RR(int process_count, int quantum);
 void RRhandler(int sig_num);
-
+// -------------------  SRTN functions---------------------------
 void SRTN(int process_count);
-
+//---------------------------------------------------------------------------------------------------------------------------------------------
 FILE *logFile;
 FILE *perfFile;
 key_t msgkey; 
@@ -159,7 +161,7 @@ void RR(int process_count, int quantum)
 4- when a process finishes, send a signal to the scheduler
 
 
- ----------------------corner case----------------------
+ ----------------------Corner case----------------------
 1- if the process is not finished and the quantum expires, add it to the end of the queue
 2- if the process is not finished and the quantum expires, but there are no other processes in the queue, continue executing it
 3- if processes finish and quantum not finished 
@@ -198,7 +200,6 @@ int RR_pid = -1;
 
             if (RR_pcb[RR_pcbidx].paused) {
                 kill(RR_pcb[RR_pcbidx].current_pid, SIGCONT);
-                RR_pcb[RR_pcbidx].paused = 0;
                 addToLog(getClk(),RR_pcbidx + 1,resumed,RR_runningProcess.arrival_time,RR_runningProcess.runtime,RR_pcb[RR_pcbidx].remainingtime,RR_pcb[RR_pcbidx].waitingtime,-1,-1);
             } else {
                 RR_pid = fork();
@@ -210,7 +211,7 @@ int RR_pid = -1;
                     sprintf(rt, "%d", RR_pcb[RR_pcbidx].remainingtime);
                     sprintf(id, "%d", RR_runningProcess.id);
                     execl("./process.out", "./process.out", rt, id, NULL);
-                    exit(1); // fail-safe
+                    exit(1); 
                 }
 
                 RR_pcb[RR_pcbidx].current_pid = RR_pid;
