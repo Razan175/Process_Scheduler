@@ -8,7 +8,7 @@ void addToPerf(struct PCB* pcb, int process_count);
 void HPF(int process_count);
 void HPFhandler(int sig_num);
 
-void RR(int process_count, int quantum);
+void RR(int process_count);
 void RRhandler(int sig_num);
 
 void SRTN(int process_count);
@@ -19,7 +19,7 @@ key_t msgkey;
 int attach;
 struct PCB* pcb;
 struct PCB* RR_pcb;
-
+int quantum;
 int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
 {
     initClk();
@@ -35,11 +35,11 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
     logFile = fopen("scheduler.log", "w");
     perfFile = fopen("scheduler.perf", "w");
 
-if (logFile == NULL || perfFile == NULL) {
-    perror("Error opening output files");
-    exit(1);
-}
-
+    if (logFile == NULL || perfFile == NULL) {
+        perror("Error opening output files");
+        exit(1);
+    }
+    quantum = atoi(argv[3]);
     
     int algo = atoi(argv[1]);
     int processes_count = atoi(argv[2]);
@@ -49,7 +49,7 @@ if (logFile == NULL || perfFile == NULL) {
     switch (algo)
     {
         case 1:
-            RR(atoi(argv[2]), atoi(argv[3]));
+            RR(atoi(argv[2]));
             addToPerf(RR_pcb,processes_count);
             break;
         case 2:
@@ -77,6 +77,7 @@ void HPF(int process_count)
 {
       
     signal(SIGCHLD,HPFhandler);
+    //tracks the number of processes that own a PCB  
     int pcbSize = 0;
     Process_queue = createPriorityQueue(process_count);
     pcb = (struct PCB*)malloc(sizeof(PCB) * process_count);
@@ -91,7 +92,6 @@ void HPF(int process_count)
             insertPriorityPriorityQueue(Process_queue, newMessage.p);
             pcb[pcbSize].processstate = ready; //The test generator sets process ids from 1->process_count in order                                         
             pcb[pcbSize++].p = newMessage.p;    //We will access PCB of a certain process through its id
-            //printf("Process %d received with priority %d\n",newMessage.p.id,newMessage.p.priority);
         }
 
         if (Process_queue->size > 0)
@@ -116,7 +116,7 @@ void HPF(int process_count)
                     pcb[pcbidx].executiontime = getClk();
                     pcb[pcbidx].processstate = running;
                     addToLog(getClk(),pcbidx + 1,running,runningProcess.arrival_time,runningProcess.runtime,runningProcess.runtime,pcb[pcbidx].waitingtime,-1,-1);
-        }
+                }                  
             }
         }
     }
@@ -143,7 +143,7 @@ int RR_pcbidx = 0;
 
 bool RR_processRunning = false;
 struct Process RR_runningProcess = {0,0,0,0,0,0,finished};
-void RR(int process_count, int quantum)
+void RR(int process_count)
 {
 /*
 1-set handler to be sent when a process finishes
@@ -168,14 +168,14 @@ void RR(int process_count, int quantum)
 
 
 
-int RR_pid = -1;
+    int RR_pid = -1;
 
     signal(SIGCHLD, RRhandler);  
 
     RR_queue = createCircularQueue(process_count);       
     RR_pcb = (struct PCB*)malloc(sizeof(PCB) * process_count);
     int pcbSize = 0;
-
+    int startTime;
     while (RR_completed < process_count) {               
 
         
@@ -188,17 +188,18 @@ int RR_pid = -1;
             pcbSize++;
         }
 
+
         // If process not running and queue is not empty, start next one
         if (!RR_processRunning && !isCircularQueueEmpty(RR_queue)) {
             RR_runningProcess = dequeueCircularQueue(RR_queue);
             RR_pcbidx = RR_runningProcess.id - 1;
-            
+
             if (RR_pcb[RR_pcbidx].processstate == finished)
                 continue;
-
+            startTime = getClk();
             if (RR_pcb[RR_pcbidx].paused) {
                 kill(RR_pcb[RR_pcbidx].current_pid, SIGCONT);
-                RR_pcb[RR_pcbidx].paused = 0;
+                //RR_pcb[RR_pcbidx].paused = 0;
                 addToLog(getClk(),RR_pcbidx + 1,resumed,RR_runningProcess.arrival_time,RR_runningProcess.runtime,RR_pcb[RR_pcbidx].remainingtime,RR_pcb[RR_pcbidx].waitingtime,-1,-1);
             } else {
                 RR_pid = fork();
@@ -212,7 +213,7 @@ int RR_pid = -1;
                     execl("./process.out", "./process.out", rt, id, NULL);
                     exit(1); // fail-safe
                 }
-
+                
                 RR_pcb[RR_pcbidx].current_pid = RR_pid;
                 RR_pcb[RR_pcbidx].executiontime = getClk();
                 RR_pcb[RR_pcbidx].waitingtime = getClk() - RR_runningProcess.arrival_time;
@@ -222,28 +223,22 @@ int RR_pid = -1;
             RR_pcb[RR_pcbidx].processstate = running;
             RR_processRunning = true;
 
-            
-            int startTime = getClk();
-            while (getClk() - startTime < quantum) {
+            /*
+            */
+
+            /*if (getClk() - startTime > quantum) {
                 int status;
-                pid_t result = waitpid(RR_pcb[RR_pcbidx].current_pid, &status, WNOHANG);
-                if (result != 0) {
-                    RR_processRunning = false;
-                    break;
+                //pid_t result = waitpid(RR_pcb[RR_pcbidx].current_pid, &status, WNOHANG);
+                if (RR_pcb[RR_pcbidx].remainingtime > quantum)
+                    sleep(quantum);
+                else
+                {
+                    pid_t result = waitpid(RR_pcb[RR_pcbidx].current_pid, &status, WNOHANG);
                 }
-            }
-
+            }*/
             
-            if (RR_processRunning) {
-                
-                kill(RR_pcb[RR_pcbidx].current_pid, SIGSTOP);
-                RR_pcb[RR_pcbidx].paused = 1;
-                RR_pcb[RR_pcbidx].remainingtime -= quantum;
-                RR_pcb[RR_pcbidx].processstate = ready;
-                addToLog(getClk(),RR_pcbidx + 1,stopped,RR_runningProcess.arrival_time,RR_runningProcess.runtime,RR_pcb[RR_pcbidx].remainingtime,RR_pcb[RR_pcbidx].waitingtime,-1,-1);
 
-        
-                if (isCircularQueueEmpty(RR_queue)) {
+                 /*if (isCircularQueueEmpty(RR_queue)) {
                     kill(RR_pcb[RR_pcbidx].current_pid, SIGCONT);
                     addToLog(getClk(),RR_pcbidx + 1,resumed,RR_runningProcess.arrival_time,RR_runningProcess.runtime,RR_pcb[RR_pcbidx].remainingtime,RR_pcb[pcbidx].waitingtime,-1,-1);
                     int moreStartTime = getClk();
@@ -258,18 +253,30 @@ int RR_pid = -1;
 
                     if (RR_processRunning) {
                         kill(RR_pcb[RR_pcbidx].current_pid, SIGSTOP);
-                        RR_pcb[RR_pcbidx].paused = 1;
-                        RR_pcb[RR_pcbidx].remainingtime -= quantum;
+                        RR_pcb[RR_pcbidx].paused = 1;      
                         RR_pcb[RR_pcbidx].processstate = ready;
                         enqueueCircularQueue(RR_queue, RR_runningProcess);
                         addToLog(getClk(),RR_pcbidx + 1,stopped,RR_runningProcess.arrival_time,RR_runningProcess.runtime,RR_pcb[RR_pcbidx].remainingtime,RR_pcb[RR_pcbidx].waitingtime,-1,-1);
                     }
-                } else {
+                }*/ 
+               /* else {
                     
-                    enqueueCircularQueue(RR_queue, RR_runningProcess);
-                }
+                    //enqueueCircularQueue(RR_queue, RR_runningProcess);
+                }*/
 
-                RR_processRunning = false;
+           // RR_processRunning = false;
+        }
+        else if (RR_processRunning)
+        {
+
+            if (getClk() - startTime >= quantum) {  
+                RR_processRunning = 0;
+                printf("hi\n");
+                kill(RR_pcb[RR_pcbidx].current_pid, SIGSTOP);
+                RR_pcb[RR_pcbidx].paused = 1;
+                RR_pcb[RR_pcbidx].processstate = ready;
+                addToLog(getClk(),RR_pcbidx + 1,stopped,RR_runningProcess.arrival_time,RR_runningProcess.runtime,RR_pcb[RR_pcbidx].remainingtime,RR_pcb[RR_pcbidx].waitingtime,-1,-1);
+                enqueueCircularQueue(RR_queue,RR_runningProcess);
             }
         }
     }
@@ -279,19 +286,23 @@ int RR_pid = -1;
 
 void RRhandler(int sig_num) 
 {
-   // if (RR_pcb[RR_pcbidx].remainingtime <= 0)
-{
-    RR_pcb[RR_pcbidx].finishedtime = getClk();
-    RR_pcb[RR_pcbidx].processstate = finished;
+    RR_pcb[RR_pcbidx].remainingtime -= quantum;
+    if(RR_pcb[RR_pcbidx].remainingtime < 0)
+        RR_pcb[RR_pcbidx].remainingtime = 0;
+    if (RR_pcb[RR_pcbidx].remainingtime == 0)
+    {
+        RR_pcb[RR_pcbidx].processstate = finished;
         RR_runningProcess.processstate = finished;
         RR_pcb[RR_pcbidx].TA = RR_pcb[RR_pcbidx].finishedtime - RR_runningProcess.arrival_time;
         RR_pcb[RR_pcbidx].WTA = RR_pcb[RR_pcbidx].TA/RR_runningProcess.runtime;
-    RR_runningProcess.processstate = finished;
-    RR_completed++;
+        RR_runningProcess.processstate = finished;
+        RR_completed++;
+        RR_processRunning = 0;
         addToLog(getClk(),RR_pcbidx + 1,finished,RR_runningProcess.arrival_time,RR_runningProcess.runtime,RR_pcb[RR_pcbidx].remainingtime,RR_pcb[RR_pcbidx].waitingtime,RR_pcb[RR_pcbidx].TA,RR_pcb[RR_pcbidx].WTA);
-    kill(getppid(), SIGUSR1);
+        kill(getppid(), SIGUSR1);
     }
-    RR_processRunning = 0;
+
+    
 }
 
 
@@ -409,5 +420,3 @@ void SRTN(int process_count)
         -generate output file
     */
    //struct msgbuff newMessage;
-
-

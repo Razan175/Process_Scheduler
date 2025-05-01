@@ -142,7 +142,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    
+
     // Step 6: Send processes to the scheduler at the appropriate time
     /**    for (int t = 0, sent = 0; sent < process_count; t++) {
         while (getClk() < t); // Wait for clock sync
@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
     raise(SIGINT);
     
 
-
+    
     return EXIT_SUCCESS;
 }
 
