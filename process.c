@@ -6,7 +6,7 @@ int quantum;
 int current_pid;
 int paused = 0;
 int oldtime=0;
-void handle_stop(int sig) 
+/*void handle_stop(int sig) 
 {
     paused = 1;
     
@@ -15,7 +15,7 @@ void handle_stop(int sig)
         //sleep(1);  // Sleep while paused to simulate a halt
    // }
    
-}
+}*/
 
 void handle_stop2(int sig) 
 {
@@ -41,13 +41,18 @@ void handler_done(int sig_num)
     destroyClk(false);
     exit(id);
 }
+void Resume(int sig_num)
+{
+   
+}
 int main(int argc, char *argv[]) {
     // Signal handling
 
-    signal(SIGSTOP, handle_stop);
+  //  signal(SIGSTOP, handle_stop);
     signal(SIGTSTP,handle_stop2);
     signal(SIGCONT, handle_cont);
     signal(SIGINT,handler_done);
+    signal(SIGUSR2,Resume);
 
     current_pid = getpid();
    
