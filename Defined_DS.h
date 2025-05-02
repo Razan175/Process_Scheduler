@@ -21,8 +21,6 @@ typedef struct Process {
     int priority;
     bool prempted;
     int memsize;
-    enum state processstate;
-
 } Process;
 
 struct msgbuff {
@@ -214,7 +212,6 @@ void insertPriorityPriorityQueue(PriorityQueue* pq, Process process) {
         return;
     }
     pq->array[pq->size] = process;
-    pq->array[pq->size].processstate = ready;
     heapifyUpPriority(pq, pq->size);
     pq->size++;
 }
