@@ -9,10 +9,10 @@ void addToPerf(struct PCB* pcb, int process_count);
 // -------------------  HPF functions---------------------------
 void HPF(int process_count);
 void HPFhandler(int sig_num);
-
+// -------------------  RR functions---------------------------
 void RR(int process_count);
 void RRhandler(int sig_num);
-
+// -------------------  SRTN functions---------------------------
 void SRTN(int process_count);
 //---------------------------------------------------------------------------------------------------------------------------------------------
 FILE *logFile;
@@ -150,85 +150,80 @@ void RR(int process_count) {
     RR_queue = createCircularQueue(process_count);
     RR_pcb = (struct PCB*)malloc(sizeof(PCB) * process_count);
     memset(RR_pcb, 0, sizeof(PCB) * process_count);
-    
 
     while (RR_completed < process_count) {
-        
-        int current_time = getClk();
-
-        
+        int current_time = getClk();  
         if(msgrcv(attach, &newMessage, sizeof(newMessage.p), 0, IPC_NOWAIT) != -1) {
-            int idx = newMessage.p.id - 1;
-            
+            int idx = newMessage.p.id - 1;       
             RR_pcb[idx].p = newMessage.p;
             RR_pcb[idx].remainingtime = newMessage.p.runtime;
             RR_pcb[idx].processstate = ready;
             enqueueCircularQueue(RR_queue, newMessage.p);
         }
-            if(Run && (current_time - RR_startTime >= quantum)) {
-               if (RR_pcb[pcbidx].remainingtime > quantum)
-                    kill(RR_current_pid, SIGSTOP);
-                int t;
-                pid_t result = waitpid(RR_pcb[pcbidx].current_pid,&t,WUNTRACED);
-                if(WIFSTOPPED(t))
-                {
-                        current_time = getClk();
-                        RR_pcb[pcbidx].processstate = stopped;
-                        RR_pcb[pcbidx].remainingtime -= quantum;
-                        addToLog(RR_pcb[pcbidx], getClk());
-                        enqueueCircularQueue(RR_queue, RR_runningProcess);       
-                    Run = false;
-                }else{
-                    RR_pcb[pcbidx].finishedtime = getClk();
-                    RR_pcb[pcbidx].processstate = finished;
-                    RR_pcb[pcbidx].TA = RR_pcb[pcbidx].finishedtime - RR_runningProcess.arrival_time;
-                    RR_pcb[pcbidx].WTA = RR_pcb[pcbidx].TA / RR_runningProcess.runtime;
-                    RR_completed++;
-                    RR_pcb[pcbidx].remainingtime = 0;
-                    Run = false;
-                    
-                    addToLog(RR_pcb[pcbidx],getClk());
-                    
-                    kill(getppid(), SIGUSR1);
-                }
-            }
-            if (!isCircularQueueEmpty(RR_queue)) {
-                if(!Run) {
-                    current_time = getClk();
-                    RR_runningProcess = dequeueCircularQueue(RR_queue);
-                    pcbidx = RR_runningProcess.id - 1;
-                    Run = true;
-                    if(RR_pcb[pcbidx].remainingtime > quantum)
-                        RR_startTime = current_time;
-                    else
-                        RR_startTime = current_time - (quantum - RR_pcb[pcbidx].remainingtime);
 
-                    if(RR_pcb[pcbidx].processstate == stopped)
-                    {
-                        printf("i resumed/n");
-                        RR_pcb[pcbidx].processstate = resumed;
-                        kill(RR_pcb[pcbidx].current_pid,SIGCONT);
-                        addToLog(RR_pcb[pcbidx],getClk());      
+        if(Run && (current_time - RR_startTime >= quantum)) {
+            if (RR_pcb[pcbidx].remainingtime > quantum)
+                kill(RR_pcb[pcbidx].current_pid, SIGSTOP);
+            int t;
+            pid_t result = waitpid(RR_pcb[pcbidx].current_pid,&t,WUNTRACED);
+            if(WIFSTOPPED(t))
+            {
+                current_time = getClk();
+                RR_pcb[pcbidx].processstate = stopped;
+                RR_pcb[pcbidx].remainingtime -= quantum;
+                addToLog(RR_pcb[pcbidx], getClk());
+                enqueueCircularQueue(RR_queue, RR_runningProcess);       
+                Run = false;
+            }
+            else 
+            {
+                RR_pcb[pcbidx].finishedtime = getClk();
+                RR_pcb[pcbidx].processstate = finished;
+                RR_pcb[pcbidx].TA = RR_pcb[pcbidx].finishedtime - RR_runningProcess.arrival_time;
+                RR_pcb[pcbidx].WTA = RR_pcb[pcbidx].TA / RR_runningProcess.runtime;
+                RR_completed++;
+                RR_pcb[pcbidx].remainingtime = 0;
+                Run = false;    
+                addToLog(RR_pcb[pcbidx],getClk());        
+                kill(getppid(), SIGUSR1);
+            }
+        }
+
+        if (!isCircularQueueEmpty(RR_queue)) {
+            if(!Run) {
+                current_time = getClk();
+                RR_runningProcess = dequeueCircularQueue(RR_queue);
+                pcbidx = RR_runningProcess.id - 1;
+                Run = true;
+                if(RR_pcb[pcbidx].remainingtime > quantum)
+                    RR_startTime = current_time;
+                else
+                    RR_startTime = current_time - (quantum - RR_pcb[pcbidx].remainingtime);
+
+                if(RR_pcb[pcbidx].processstate == stopped)
+                {
+                    RR_pcb[pcbidx].processstate = resumed;
+                    kill(RR_pcb[pcbidx].current_pid,SIGCONT);
+                    addToLog(RR_pcb[pcbidx],getClk());      
+                }
+                else
+                {
+                    RR_pcb[pcbidx].current_pid = fork();
+                    if (RR_pcb[pcbidx].current_pid == 0) {
+                        char rt[10], id[10];
+                        sprintf(rt, "%d", RR_pcb[pcbidx].remainingtime);
+                        sprintf(id, "%d", RR_runningProcess.id);
+                        execl("./process.out", "./process.out", rt, id, NULL);
                     }
-                    else
-                    {
-                        RR_current_pid = fork();
-                        if (RR_current_pid == 0) {
-                            char rt[10], id[10];
-                            sprintf(rt, "%d", RR_pcb[pcbidx].remainingtime);
-                            sprintf(id, "%d", RR_runningProcess.id);
-                            execl("./process.out", "./process.out", rt, id, NULL);
-                        }
-                        else {
+                    else {
                         RR_pcb[pcbidx].waitingtime = current_time - RR_runningProcess.arrival_time;
                         RR_pcb[pcbidx].processstate = running;
                     
                         addToLog(RR_pcb[pcbidx],getClk());
                     }
                 }
-                }
             }
-    
+        }
     }
 }
 

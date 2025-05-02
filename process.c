@@ -21,7 +21,7 @@ void handle_stop2(int sig)
 {
     paused = 1;
     remainingtime++;
-    printf("Process %d paused.\n", current_pid);
+    //printf("Process %d paused.\n", current_pid);
     while (paused) {
         //sleep(1);  // Sleep while paused to simulate a halt
     }
@@ -50,10 +50,10 @@ int main(int argc, char *argv[]) {
     // Signal handling
 
   //  signal(SIGSTOP, handle_stop);
-    signal(SIGTSTP,handle_stop2);
-    signal(SIGCONT, handle_cont);
+    //signal(SIGTSTP,handle_stop2);
+    //signal(SIGCONT, handle_cont);
     signal(SIGINT,handler_done);
-    signal(SIGUSR2,Resume);
+    //signal(SIGUSR2,Resume);
 
     current_pid = getpid();
    
@@ -77,18 +77,17 @@ int main(int argc, char *argv[]) {
             //oldtime = remainingtime;
             //int current_time = getClk();
             
-            remainingtime--;
-            printf("Process %d remaining time: %d current time: %d\n", current_pid, remainingtime, getClk());
             
-            //while (getClk() < current_time + 1)
-            //{
-                // absolute cinema
-            //}
+            //printf("Process %d remaining time: %d current time: %d\n", current_pid, remainingtime, getClk());
+            
+           // while (getClk() < current_time + 1)
+            {
+            }
+            remainingtime--;
             
         }
     }
     raise(SIGINT);
-    destroyClk(false);
-    return 0;
+
 }
 
