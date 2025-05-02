@@ -16,7 +16,6 @@ void ProcessCompleted(int signum);
 // Global variables
 int msgQid;
 Process* processes;
-char* File_name;
 int total_runtime = 0;
 int scheduler_pid;
 int clk_pid;
@@ -26,26 +25,38 @@ int CompletedByScheduler = 0;
 int main(int argc, char* argv[]) {
 
     // Validate input arguments
-    if (argc < 3) {
-        fprintf(stderr, "Usage: %s <processes_file> <algorithm_number> [quantum]\n", argv[0]);
+    if (argc < 1) {
+        fprintf(stderr, "Usage: %s <processes_file> \n", argv[0]);
         return EXIT_FAILURE;
     }
 
     signal(SIGINT, clearResources); // Handle termination signal
     signal(SIGUSR1, ProcessCompleted);
 
-    // Correct memory allocation for File_name
-    File_name = strdup(argv[1]);
-    if (!File_name) {
-        perror("Failed to allocate memory for File_name");
-        return EXIT_FAILURE;
+    int algo_num;
+    fprintf(stdout,"Please enter the algorithm you want to use ([1] Round Robin [2] SRTN [3] HPF):\n");
+    scanf("%d",&algo_num);
+
+    while (algo_num > 3 && algo_num < 1)
+    {
+        fprintf(stdout,"Please enter a valid number([1] Round Robin [2] SRTN [3] HPF):\n");
     }
 
+    int quantum;
+
+    if (algo_num == 1)
+    {
+        do
+        {
+            fprintf(stdout,"Please enter your preferred quantum:\n");
+            scanf("%d",&quantum);
+        }
+        while (quantum < 0);
+    }
     // Step 1: Read input file to count the number of processes
-    FILE* file = fopen(File_name, "r");
+    FILE* file = fopen(argv[1], "r");
     if (!file) {
         perror("Error opening processes.txt");
-        free(File_name);
         return EXIT_FAILURE;
     }
 
@@ -58,12 +69,12 @@ int main(int argc, char* argv[]) {
             continue;
         process_count++;
     }
+
     free(line);
     fclose(file);
 
     if (process_count == 0) {
         fprintf(stderr, "No valid processes found in input file.\n");
-        free(File_name);
         return EXIT_FAILURE;
     }
 
@@ -71,22 +82,21 @@ int main(int argc, char* argv[]) {
     processes = (Process*)malloc(process_count * sizeof(Process));
     if (!processes) {
         perror("Error allocating memory for processes");
-        free(File_name);
         return EXIT_FAILURE;
     }
 
     // Step 3: Populate process array from the input file
-    file = fopen(File_name, "r");
+    file = fopen(argv[1], "r");
     if (!file) {
         perror("Error reopening processes.txt");
         free(processes);
-        free(File_name);
         return EXIT_FAILURE;
     }
 
     int i = 0;
     line = NULL;
     len = 0;
+
     while (getline(&line, &len, file) != -1) {
         if (line[0] == '#')
             continue;
@@ -111,22 +121,23 @@ int main(int argc, char* argv[]) {
     fclose(file);
 
     // Step 4: Start clock and scheduler processes
-    int algo_num = atoi(argv[2]);
+
     char quantum_str[10] = "";
-    if (argc > 3)
-        sprintf(quantum_str, "%d", atoi(argv[3]));
-
-
+    if (algo_num == 1)
+        sprintf(quantum_str, "%d",quantum);
 
     char process_count_str[10];
     sprintf(process_count_str, "%d", process_count); //copy any thing to string 
 
+    char algo_num_str[10];
+    sprintf(algo_num_str, "%d", algo_num); //copy any thing to string 
+
     scheduler_pid = fork();
     if (scheduler_pid == 0) {
-        if (argc > 3)
-            execl("./scheduler.out", "./scheduler.out", argv[2], process_count_str, quantum_str, NULL);
+        if (algo_num == 1)
+            execl("./scheduler.out", "./scheduler.out", algo_num_str, process_count_str, quantum_str, NULL);
         else
-            execl("./scheduler.out", "./scheduler.out", argv[2], process_count_str, NULL);
+            execl("./scheduler.out", "./scheduler.out", algo_num_str, process_count_str, NULL);
         perror("Scheduler execution failed");
         exit(EXIT_FAILURE);
     }
@@ -137,7 +148,6 @@ int main(int argc, char* argv[]) {
     if (msgQid == -1) {
         perror("Failed to create message queue");
         free(processes);
-        free(File_name);
         destroyClk(true);
         return EXIT_FAILURE;
     }
@@ -170,7 +180,6 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    sleep(1);
     initClk();
     // Step 6: Send processes to the scheduler at the appropriate time
     for (int i = 0; i < process_count; i++)
@@ -210,9 +219,6 @@ void clearResources(int signum)
     msgctl(msgQid, IPC_RMID, NULL);
     if (processes)
         free(processes);
-    if (File_name)
-        free(File_name);
-
     //kill(scheduler_pid, SIGINT);
     int status;
     waitpid(scheduler_pid, &status, 0);
