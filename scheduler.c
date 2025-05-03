@@ -1,27 +1,37 @@
 #include <math.h>
 #include "headers.h"
 #include "Defined_DS.h"
+
 // -------------------Closing the scheduler---------------------
 void closeScheduler(int sig_num);
+
 // -------------------  Output file functions-------------------
 void addToLog(struct PCB pbcblock,int time);
 void addToPerf(struct PCB* pcb, int process_count);
+
 // -------------------  HPF functions---------------------------
 void HPF(int process_count);
 void HPFhandler(int sig_num);
+
 // -------------------  RR functions---------------------------
-void RR(int process_count);
-void RRhandler(int sig_num);
+void RR(int process_count, int quantum);
+
 // -------------------  SRTN functions---------------------------
 void SRTN(int process_count);
-//---------------------------------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------
+
 FILE *logFile;
 FILE *perfFile;
+
 key_t msgkey; 
 int attach;
+
 struct PCB* pcb;
 struct PCB* RR_pcb;
-int quantum;
+
+double util = 0;
+int finish;
+
 int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
 {
     initClk();
@@ -32,33 +42,37 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
     if(attach == -1)
     {
         perror("message queue not attached");
+        exit(1);
     }
 
     logFile = fopen("scheduler.log", "w");
     perfFile = fopen("scheduler.perf", "w");
+    
 
     if (logFile == NULL || perfFile == NULL) {
         perror("Error opening output files");
+        msgctl(attach,IPC_RMID,NULL);
         exit(1);
     }
     
+    fprintf(logFile,"#At time x process y state arr w total z remain y wait k\n");
+
     int algo = atoi(argv[1]);
     int processes_count = atoi(argv[2]);
 
-    printf("Scheduler PID: %d \n",getpid());
 
     switch (algo)
     {
-        case 1:
-            quantum = atoi(argv[3]);  
-            RR(atoi(argv[2]));
+        case 1: 
+            RR(processes_count,atoi(argv[3]));
+            finish = getClk();
             addToPerf(RR_pcb,processes_count);
             break;
         case 2:
-            SRTN(atoi(argv[2]));
+            SRTN(processes_count);
             break;
         case 3:
-            HPF(atoi(argv[2])); 
+            HPF(processes_count); 
             addToPerf(pcb,processes_count);
             break;
         default:
@@ -72,7 +86,7 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
 
 PriorityQueue *Process_queue;
 int completed;
-struct Process runningProcess = {0,0,0,0,0,0};
+struct Process runningProcess = {0,0,0,0};
 int pcbidx = 0;     //tracks the current running process index
 
 void HPF(int process_count)
@@ -91,9 +105,9 @@ void HPF(int process_count)
         {
             printf("Process %d received at time %d\n",newMessage.p.id,getClk());
             insertPriorityPriorityQueue(Process_queue, newMessage.p);
-            pcb[pcbSize].processstate = ready; //The test generator sets process ids from 1->process_count in order                                         
-            pcb[pcbSize].remainingtime = newMessage.p.runtime; 
-            pcb[pcbSize++].p = newMessage.p;    //We will access PCB of a certain process through its id
+            pcb[pcbSize].processstate = ready;                  //The test generator sets process ids from 1->process_count in order                                         
+            pcb[pcbSize].remainingtime = newMessage.p.runtime;  //We will access PCB of a certain process through its id
+            pcb[pcbSize++].p = newMessage.p;    
         }
 
         if (Process_queue->size > 0)
@@ -131,29 +145,26 @@ void HPFhandler(int sig_num)
     pcb[pcbidx].TA = pcb[pcbidx].finishedtime - runningProcess.arrival_time ;
     pcb[pcbidx].WTA = pcb[pcbidx].TA/runningProcess.runtime;
     completed++;
-    addToLog(pcb[pcbidx],getClk());
-    kill(getppid(),SIGUSR1);
-    
+    addToLog(pcb[pcbidx],getClk());    
 }
 
 
 //////////////////////////////////// Round Robin ///////////////////////////////////////////////////////
 CircularQueue* RR_queue;
 int RR_completed = 0;
-struct Process RR_runningProcess = {0,0,0,0,0,0};
+struct Process RR_runningProcess = {0,0,0,0};
 bool Run = false;
 int RR_startTime = 0;
 int RR_current_pid = -1;
 
-void RR(int process_count) {
-    
+void RR(int process_count, int quantum) {   
     RR_queue = createCircularQueue(process_count);
     RR_pcb = (struct PCB*)malloc(sizeof(PCB) * process_count);
     memset(RR_pcb, 0, sizeof(PCB) * process_count);
 
     while (RR_completed < process_count) {
-        int current_time = getClk();  
-        if(msgrcv(attach, &newMessage, sizeof(newMessage.p), 0, IPC_NOWAIT) != -1) {
+
+        while (msgrcv(attach, &newMessage, sizeof(newMessage.p), 0, IPC_NOWAIT) != -1) {
             int idx = newMessage.p.id - 1;       
             RR_pcb[idx].p = newMessage.p;
             RR_pcb[idx].remainingtime = newMessage.p.runtime;
@@ -161,9 +172,12 @@ void RR(int process_count) {
             enqueueCircularQueue(RR_queue, newMessage.p);
         }
 
+        int current_time = getClk();
+    
         if(Run && (current_time - RR_startTime >= quantum)) {
             if (RR_pcb[pcbidx].remainingtime > quantum)
                 kill(RR_pcb[pcbidx].current_pid, SIGSTOP);
+
             int t;
             pid_t result = waitpid(RR_pcb[pcbidx].current_pid,&t,WUNTRACED);
             if(WIFSTOPPED(t))
@@ -191,10 +205,12 @@ void RR(int process_count) {
 
         if (!isCircularQueueEmpty(RR_queue)) {
             if(!Run) {
-                current_time = getClk();
+
                 RR_runningProcess = dequeueCircularQueue(RR_queue);
                 pcbidx = RR_runningProcess.id - 1;
                 Run = true;
+
+                current_time = getClk();
                 if(RR_pcb[pcbidx].remainingtime > quantum)
                     RR_startTime = current_time;
                 else
@@ -240,43 +256,45 @@ void SRTN(int process_count)
         6- if the next process was never forked before, fork it, else resume it
     */
 }
-   void addToLog(struct PCB pcblock, int time)
-   {
-        int process_id = pcblock.p.id;
-        enum state state_num = pcblock.processstate;
-        int arrival = pcblock.p.arrival_time;
-        int runtime = pcblock.p.runtime;
-        int remaining_time = pcblock.remainingtime;
-        int wait_time = pcblock.waitingtime; 
-        double TA = pcblock.TA;
-        double WTA =  pcblock.WTA;
-        char* state;
-        switch (state_num)
-        {
-            case running:
-            state = "Started";
-            break;
-            case stopped:
-            state = "Stopped";
-            break;
-            case resumed:
-            state = "Resumed";
-            break;
-            case finished:
-            state = "Finished";
-            fprintf(logFile, "At time %d process %d %s arr %d total %d remain %d wait %d TA %f WTA %.2f\n",time,process_id,state,arrival,runtime,remaining_time,wait_time,TA,WTA);
-            return;
-            default:
-            return;
-        }
+void addToLog(struct PCB pcblock, int time)
+{
+    int process_id = pcblock.p.id;
+    enum state state_num = pcblock.processstate;
+    int arrival = pcblock.p.arrival_time;
+    int runtime = pcblock.p.runtime;
+    int remaining_time = pcblock.remainingtime;
+    int wait_time = pcblock.waitingtime; 
+    double TA = pcblock.TA;
+    double WTA =  pcblock.WTA;
+    char* state;
+    switch (state_num)
+    {
+        case running:
+        state = "Started";
+        break;
+        case stopped:
+        state = "Stopped";
+        break;
+        case resumed:
+        state = "Resumed";
+        break;
+        case finished:
+        state = "Finished";
+        break;
+        default:
+        return;
+    }
 
-        fprintf(logFile, "At time %d process %d %s arr %d total %d remain %d wait %d\n",time,process_id,state,arrival,runtime,remaining_time,wait_time);
-       // fwrite(data,sizeof(data),sizeof(data)/sizeof(data[0]),logFile);)
-   }
+    fprintf(logFile, "At time %d process %d %s arr %d total %d remain %d wait %d",time,process_id,state,arrival,runtime,remaining_time,wait_time);
+    
+    if (state == "Finished")
+        fprintf(logFile, " TA %.0f WTA %.2f",TA,WTA);   
+    
+    fprintf(logFile,"\n");
+}
 
-   void addToPerf(struct PCB *pcb, int process_count)
-   {
-
+void addToPerf(struct PCB *pcb, int process_count)
+{
     double avgWait = 0, avgWTA = 0, stdWTA = 0;
 
     for(int i = 0; i < process_count; i++)
@@ -293,27 +311,30 @@ void SRTN(int process_count)
 
     stdWTA /= (double)process_count;
     stdWTA = sqrt(stdWTA);
+    util = (util/ finish )* 100;
+    fprintf(perfFile,"CPU utilization = %.2f%%\nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f\n",util,avgWTA,avgWait,stdWTA);
+}
 
-    fprintf(perfFile,"Avg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f\n",avgWTA,avgWait,stdWTA);
-   }
+void closeScheduler(int sig_num)
+{
+    printf("Cleaning up resources as Scheduler\n");
+    if(logFile)
+        fclose(logFile);
+    if(perfFile)
+        fclose(perfFile);
 
-   void closeScheduler(int sig_num)
-   {
-       if(logFile)
-           fclose(logFile);
-       if(perfFile)
-           fclose(perfFile);
-       if(pcb)
-           free(pcb);
-   
-       destroyPriorityQueue(Process_queue);
-   
-       //if(attach != -1)
-         //  msgctl(attach,IPC_RMID,NULL);
-       destroyClk(false);
-       
-       destroyCircularQueue(RR_queue);
+    if(pcb)
+        free(pcb);
 
-       if(RR_pcb)
-            free(RR_pcb);
-   }
+    destroyPriorityQueue(Process_queue);
+
+    if(attach != -1)
+        msgctl(attach,IPC_RMID,NULL);
+        
+    destroyClk(false);
+    
+    destroyCircularQueue(RR_queue);
+
+    if(RR_pcb)
+         free(RR_pcb);
+}

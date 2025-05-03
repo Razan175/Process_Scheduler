@@ -20,40 +20,19 @@ int total_runtime = 0;
 int scheduler_pid;
 int clk_pid;
 int CompletedByScheduler = 0;
-
+int status = 0;
 
 int main(int argc, char* argv[]) {
 
+    signal(SIGINT, clearResources); // Handle termination signal
+    
     // Validate input arguments
     if (argc < 1) {
         fprintf(stderr, "Usage: %s <processes_file> \n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    signal(SIGINT, clearResources); // Handle termination signal
-    signal(SIGUSR1, ProcessCompleted);
-
-    int algo_num;
-    fprintf(stdout,"Please enter the algorithm you want to use ([1] Round Robin [2] SRTN [3] HPF):\n");
-    scanf("%d",&algo_num);
-
-    while (algo_num > 3 && algo_num < 1)
-    {
-        fprintf(stdout,"Please enter a valid number([1] Round Robin [2] SRTN [3] HPF):\n");
-    }
-
-    int quantum;
-
-    if (algo_num == 1)
-    {
-        do
-        {
-            fprintf(stdout,"Please enter your preferred quantum:\n");
-            scanf("%d",&quantum);
-        }
-        while (quantum < 0);
-    }
-    // Step 1: Read input file to count the number of processes
+    // Read input file to count the number of processes
     FILE* file = fopen(argv[1], "r");
     if (!file) {
         perror("Error opening processes.txt");
@@ -78,14 +57,14 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    // Step 2: Allocate memory for processes
+    // Allocate memory for processes
     processes = (Process*)malloc(process_count * sizeof(Process));
     if (!processes) {
         perror("Error allocating memory for processes");
         return EXIT_FAILURE;
     }
 
-    // Step 3: Populate process array from the input file
+    // Populate process array from the input file
     file = fopen(argv[1], "r");
     if (!file) {
         perror("Error reopening processes.txt");
@@ -107,7 +86,6 @@ int main(int argc, char* argv[]) {
                    &processes[i].runtime, 
                    &processes[i].priority) == 4) 
         {
-            processes[i].prempted = false;
             total_runtime += processes[i].runtime;
             i++;
         }
@@ -116,21 +94,39 @@ int main(int argc, char* argv[]) {
     if (process_count > 0) {
         total_runtime += processes[0].arrival_time;
     }
-
+    
     free(line);
     fclose(file);
 
-    // Step 4: Start clock and scheduler processes
+    // 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any.
+    int algo_num;
+    fprintf(stdout,"Please enter the algorithm you want to use ([1] Round Robin [2] SRTN [3] HPF):\n");
+    scanf("%d",&algo_num);
 
-    char quantum_str[10] = "";
+    while (algo_num > 3 && algo_num < 1)
+        fprintf(stdout,"Please enter a valid number([1] Round Robin [2] SRTN [3] HPF):\n");
+
+    int quantum;
+
+    if (algo_num == 1)
+    {
+        do
+        {
+            fprintf(stdout,"Please enter your preferred quantum:\n");
+            scanf("%d",&quantum);
+        }
+        while (quantum < 0);
+    }
+    // 3. Initiate and create the scheduler and clock processes.   
+    char quantum_str[10];
     if (algo_num == 1)
         sprintf(quantum_str, "%d",quantum);
 
     char process_count_str[10];
-    sprintf(process_count_str, "%d", process_count); //copy any thing to string 
+    sprintf(process_count_str, "%d", process_count);  
 
     char algo_num_str[10];
-    sprintf(algo_num_str, "%d", algo_num); //copy any thing to string 
+    sprintf(algo_num_str, "%d", algo_num);  
 
     scheduler_pid = fork();
     if (scheduler_pid == 0) {
@@ -141,8 +137,15 @@ int main(int argc, char* argv[]) {
         perror("Scheduler execution failed");
         exit(EXIT_FAILURE);
     }
-// need to change ipc_private
-    // Step 5: Message queue setup  
+
+    clk_pid = fork();
+    if (clk_pid == 0) {
+        execl("./clk.out", "./clk.out", NULL);
+        perror("Clock execution failed");
+        exit(EXIT_FAILURE);
+    }
+
+    //Message queue setup  
     key_t msgkey = ftok("keyfile",'p');
     msgQid = msgget(msgkey, 0666 | IPC_CREAT);
     if (msgQid == -1) {
@@ -152,35 +155,12 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-
-    // Step 6: Send processes to the scheduler at the appropriate time
-    /**    for (int t = 0, sent = 0; sent < process_count; t++) {
-        while (getClk() < t); // Wait for clock sync
-
-        for (int j = 0; j < process_count; j++) {
-            if (processes[j].arrival_time == t) {
-                
-                newMessage.p = processes[j];
-
-                if (msgsnd(msgQid, &newMessage, sizeof(newMessage), 0) == -1) {
-                    perror("Error sending process to scheduler");
-                } else {
-                    printf("Sent Process %d to scheduler at time %d\n", processes[j].id, t);
-                    sent++;
-                }
-            }
-        }
-    }
-*/
-//struct msgbuff msg;
-    clk_pid = fork();
-    if (clk_pid == 0) {
-        execl("./clk.out", "./clk.out", NULL);
-        perror("Clock execution failed");
-        exit(EXIT_FAILURE);
-    }
-
+    // 4. Use this function after creating the clock process to initialize clock
     initClk();
+
+    // 5. Create a data structure for processes and provide it with its parameters.
+    struct msgbuff newMessage;
+
     // Step 6: Send processes to the scheduler at the appropriate time
     for (int i = 0; i < process_count; i++)
     {
@@ -195,34 +175,27 @@ int main(int argc, char* argv[]) {
         }
 
     }
-        
-    /*
-    for each proces
-        1-while(scan arrival time[i] != getclk());
-        2-send in msgqueue
-        3-printf proccess sent at time t
-    */
 
-    while (CompletedByScheduler < process_count) {}
-
-    printf("All processes have been sent and completed!\nShutting down Process Generator and Scheduler.\n");
     raise(SIGINT);
-    
-
-    
+        
     return EXIT_SUCCESS;
 }
 
 void clearResources(int signum) 
 {
-    printf("Cleaning up resources as Process generator...\n");
-    msgctl(msgQid, IPC_RMID, NULL);
-    if (processes)
-        free(processes);
-    //kill(scheduler_pid, SIGINT);
-    int status;
+    //TODO Clears all resources in case of interruption
+
+    //wait for the scheduler to finish
     waitpid(scheduler_pid, &status, 0);
 
+    printf("Cleaning up resources as Process generator...\n");
+
+    msgctl(msgQid, IPC_RMID, NULL);
+    
+    if (processes)
+        free(processes);
+        
+    // 7. Clear clock resources
     destroyClk(true);
     waitpid(clk_pid, &status, 0);
 

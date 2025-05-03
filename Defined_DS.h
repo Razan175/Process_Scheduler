@@ -5,6 +5,18 @@
 #ifndef Engine
 #define Engine
 
+typedef struct Process {
+    int id;
+    int arrival_time;
+    int runtime;
+    int priority;
+} Process;
+
+struct msgbuff {
+    Process p;
+}newMessage;
+
+//process states
 enum state
 {
     ready,
@@ -13,26 +25,6 @@ enum state
     resumed,
     finished
 };
-
-typedef struct Process {
-    int id;
-    int arrival_time;
-    int runtime;
-    int priority;
-    bool prempted;
-    int memsize;
-} Process;
-
-struct msgbuff {
-    Process p;
-}newMessage;
-
-  /*
-  1-utilization
-  2-average weighted turnaround = (finishedtime - response time)/runtime
-  3-average wait time = response - arrival?
-  4-standard deviation of avergae weighted turnaround
-  */
 //Process Control Block
 struct PCB
 {
@@ -252,7 +244,8 @@ Process removeRuntimePriorityQueue(PriorityQueue* pq) {
 
 void destroyPriorityQueue(PriorityQueue* pq) {
     if (pq != NULL) {
-        free(pq->array);
+        if (pq->array != NULL)
+            free(pq->array);
         free(pq);
     }
 }
