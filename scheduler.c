@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
     {
         case 1: 
             RR(processes_count,atoi(argv[3]));
-            finish = getClk();
+            //finish = getClk();
             addToPerf(RR_pcb,processes_count);
             break;
         case 2:
@@ -199,7 +199,7 @@ void RR(int process_count, int quantum) {
                 RR_pcb[pcbidx].remainingtime = 0;
                 Run = false;    
                 addToLog(RR_pcb[pcbidx],getClk());        
-                kill(getppid(), SIGUSR1);
+               
             }
         }
 
@@ -295,12 +295,22 @@ void addToLog(struct PCB pcblock, int time)
 
 void addToPerf(struct PCB *pcb, int process_count)
 {
-    double avgWait = 0, avgWTA = 0, stdWTA = 0;
-
+    
+    double avgWait = 0, avgWTA = 0, stdWTA = 0,totalexc=0 ;
+    int arrive;
+    int totalrun;
+    finish=pcb[0].finishedtime;
+    arrive=pcb[0].p.arrival_time;
     for(int i = 0; i < process_count; i++)
     {
+        
         avgWait += pcb[i].waitingtime;
+        totalexc +=pcb[i].p.runtime;
         avgWTA += pcb[i].WTA;
+        if(pcb[i].p.arrival_time < arrive)
+            arrive = pcb[i].p.arrival_time;
+        if(pcb[i].finishedtime>finish)
+            finish=pcb[i].finishedtime;
     }
 
     avgWait /= (double)process_count;
@@ -311,7 +321,9 @@ void addToPerf(struct PCB *pcb, int process_count)
 
     stdWTA /= (double)process_count;
     stdWTA = sqrt(stdWTA);
-    util = (util/ finish )* 100;
+    totalrun=finish-arrive;
+    util=(totalexc/totalrun)*100;
+
     fprintf(perfFile,"CPU utilization = %.2f%%\nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f\n",util,avgWTA,avgWait,stdWTA);
 }
 
