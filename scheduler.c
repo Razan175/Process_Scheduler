@@ -22,7 +22,6 @@ int attach;
 struct PCB* pcb;
 struct PCB* RR_pcb;
 int quantum;
-int quantum;
 int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
 {
     initClk();
@@ -43,11 +42,6 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
         exit(1);
     }
     quantum = atoi(argv[3]);
-    if (logFile == NULL || perfFile == NULL) {
-        perror("Error opening output files");
-        exit(1);
-    }
-    quantum = atoi(argv[3]);
     
     int algo = atoi(argv[1]);
     int processes_count = atoi(argv[2]);
@@ -57,7 +51,6 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
     switch (algo)
     {
         case 1:
-            RR(atoi(argv[2]));
             RR(atoi(argv[2]));
             addToPerf(RR_pcb,processes_count);
             break;
@@ -86,7 +79,6 @@ void HPF(int process_count)
 {
       
     signal(SIGCHLD,HPFhandler);
-    //tracks the number of processes that own a PCB  
     //tracks the number of processes that own a PCB  
     int pcbSize = 0;
     Process_queue = createPriorityQueue(process_count);
@@ -126,7 +118,6 @@ void HPF(int process_count)
                     pcb[pcbidx].executiontime = getClk();
                     pcb[pcbidx].processstate = running;
                     addToLog(getClk(),pcbidx + 1,running,runningProcess.arrival_time,runningProcess.runtime,runningProcess.runtime,pcb[pcbidx].waitingtime,-1,-1);
-                }                  
                 }                  
             }
         }
