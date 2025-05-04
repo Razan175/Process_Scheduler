@@ -212,7 +212,6 @@ void RR(int process_count, int quantum) {
 
             if(!Run) {
                 util += getClk() - pausetime;          
-                printf("%f\n",util);          
                 RR_runningProcess = dequeueCircularQueue(RR_queue);
                 pcbidx = RR_runningProcess.id - 1;
                 Run = true;
@@ -313,8 +312,7 @@ void addToPerf(struct PCB *pcb, int process_count)
         avgWait += pcb[i].waitingtime;
         totalexc +=pcb[i].p.runtime;
         avgWTA += pcb[i].WTA;
-        //if(pcb[i].p.arrival_time < arrive)
-          //  arrive = pcb[i].p.arrival_time;
+
         if(pcb[i].finishedtime>finish)
             finish=pcb[i].finishedtime;
     }
@@ -327,7 +325,7 @@ void addToPerf(struct PCB *pcb, int process_count)
 
     stdWTA /= (double)process_count;
     stdWTA = sqrt(stdWTA);
-    //totalrun = finish - arrive;
+
     util = (1 - (util/finish))*100;
 
     fprintf(perfFile,"CPU utilization = %.2f%%\nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f\n",util,avgWTA,avgWait,stdWTA);
