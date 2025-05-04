@@ -128,6 +128,14 @@ int main(int argc, char* argv[]) {
     char algo_num_str[10];
     sprintf(algo_num_str, "%d", algo_num);  
 
+
+    clk_pid = fork();
+    if (clk_pid == 0) {
+        execl("./clk.out", "./clk.out", NULL);
+        perror("Clock execution failed");
+        exit(EXIT_FAILURE);
+    }
+    
     scheduler_pid = fork();
     if (scheduler_pid == 0) {
         if (algo_num == 1)
@@ -135,13 +143,6 @@ int main(int argc, char* argv[]) {
         else
             execl("./scheduler.out", "./scheduler.out", algo_num_str, process_count_str, NULL);
         perror("Scheduler execution failed");
-        exit(EXIT_FAILURE);
-    }
-
-    clk_pid = fork();
-    if (clk_pid == 0) {
-        execl("./clk.out", "./clk.out", NULL);
-        perror("Clock execution failed");
         exit(EXIT_FAILURE);
     }
 

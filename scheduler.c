@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
     {
         case 1: 
             RR(processes_count,atoi(argv[3]));
-            //finish = getClk();
+            finish = getClk();
             addToPerf(RR_pcb,processes_count);
             break;
         case 2:
@@ -88,6 +88,7 @@ PriorityQueue *Process_queue;
 int completed;
 struct Process runningProcess = {0,0,0,0};
 int pcbidx = 0;     //tracks the current running process index
+int pausetime = 0;
 
 void HPF(int process_count)
 {
@@ -114,6 +115,7 @@ void HPF(int process_count)
         {
             //if the current running process is finished or if this is the first process 
             if (pcb[pcbidx].processstate == finished || pcb[pcbidx].processstate == ready)   {
+                util += getClk() - pausetime;
                 runningProcess = removePriorityPriorityQueue(Process_queue);
                 pid = fork();
                 if (pid == 0)
@@ -140,6 +142,8 @@ void HPF(int process_count)
 void HPFhandler(int sig_num)
 {
     //sets the needed pcb info of the finished process
+    pausetime = getClk();
+    pcb[pcbidx].remainingtime = 0;
     pcb[pcbidx].finishedtime = getClk();
     pcb[pcbidx].processstate = finished;
     pcb[pcbidx].TA = pcb[pcbidx].finishedtime - runningProcess.arrival_time ;
@@ -163,7 +167,7 @@ void RR(int process_count, int quantum) {
     memset(RR_pcb, 0, sizeof(PCB) * process_count);
 
     while (RR_completed < process_count) {
-        int time = getClk()+1;
+
         while (msgrcv(attach, &newMessage, sizeof(newMessage.p), 0, IPC_NOWAIT) != -1) {
             int idx = newMessage.p.id - 1;       
             RR_pcb[idx].p = newMessage.p;
@@ -179,6 +183,7 @@ void RR(int process_count, int quantum) {
                 kill(RR_pcb[pcbidx].current_pid, SIGSTOP);
 
             int t;
+            pausetime = getClk();
             pid_t result = waitpid(RR_pcb[pcbidx].current_pid,&t,WUNTRACED);
             if(WIFSTOPPED(t))
             {
@@ -206,13 +211,11 @@ void RR(int process_count, int quantum) {
         if (!isCircularQueueEmpty(RR_queue)) {
 
             if(!Run) {
-                if(pcbidx!=0)
-                 util-=getClk()-RR_pcb[pcbidx].finishedtime;
+                util += getClk() - pausetime;          
+                printf("%f\n",util);          
                 RR_runningProcess = dequeueCircularQueue(RR_queue);
-
                 pcbidx = RR_runningProcess.id - 1;
                 Run = true;
-
                 current_time = getClk();
                 if(RR_pcb[pcbidx].remainingtime > quantum)
                     RR_startTime = current_time;
@@ -310,8 +313,8 @@ void addToPerf(struct PCB *pcb, int process_count)
         avgWait += pcb[i].waitingtime;
         totalexc +=pcb[i].p.runtime;
         avgWTA += pcb[i].WTA;
-        if(pcb[i].p.arrival_time < arrive)
-            arrive = pcb[i].p.arrival_time;
+        //if(pcb[i].p.arrival_time < arrive)
+          //  arrive = pcb[i].p.arrival_time;
         if(pcb[i].finishedtime>finish)
             finish=pcb[i].finishedtime;
     }
@@ -324,9 +327,8 @@ void addToPerf(struct PCB *pcb, int process_count)
 
     stdWTA /= (double)process_count;
     stdWTA = sqrt(stdWTA);
-    totalrun=finish-arrive;
-    util +=totalexc;
-    util =(util/totalrun)*100;
+    //totalrun = finish - arrive;
+    util = (1 - (util/finish))*100;
 
     fprintf(perfFile,"CPU utilization = %.2f%%\nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f\n",util,avgWTA,avgWait,stdWTA);
 }
