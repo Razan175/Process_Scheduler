@@ -10,4 +10,8 @@ clean:
 all: clean build
 
 run:
+<<<<<<< HEAD
 	./process_generator.out processes.txt 1 2
+=======
+	./process_generator.out processes.txt
+>>>>>>> 1b75e691e9b3a03d951981109a71020fd973105b
