@@ -11,9 +11,9 @@ int oldtime=0;
     paused = 1;
     
     printf("Process %d paused.\n", current_pid);
-    //while (paused) {
+    while (paused) {
         //sleep(1);  // Sleep while paused to simulate a halt
-   // }
+    }
    
 }*/
 
@@ -32,6 +32,7 @@ void handle_cont(int sig)
 {
     paused = 0;
     printf("Process %d resumed.\n", current_pid);
+
 }
 
 int id;
