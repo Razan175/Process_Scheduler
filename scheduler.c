@@ -21,6 +21,8 @@ void RR(int process_count, int quantum);
 void SRTN(int process_count);
 //----------------------------------------------------------------
 
+MemBlock* allocateMem(MemBlock* root, int size, int process_id);
+
 FILE *logFile;
 FILE *perfFile;
 FILE *MemFile;
@@ -31,7 +33,7 @@ int attach;
 CircularQueue *BlockList;
 struct PCB* pcb;
 struct PCB* RR_pcb;
-struct MemoryBlock* mem;
+struct MemTree* mem;
 
 double util = 0;
 int finish;
@@ -40,7 +42,7 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
 {
     initClk();
     signal(SIGINT,closeScheduler);
-    mem = createMemBlock(0, 1024, NULL);
+    mem = createMemTree();
 
     msgkey = ftok("keyfile",'p');
     attach = msgget(msgkey, 0666 | IPC_CREAT);
@@ -99,7 +101,7 @@ int pausetime = 0;
 
 void HPF(int process_count)
 {
-     completed = 0; 
+    completed = 0; 
     signal(SIGCHLD,HPFhandler);
     //tracks the number of processes that own a PCB  
     int pcbSize = 0;
@@ -127,15 +129,25 @@ void HPF(int process_count)
                 util += getClk() - pausetime;
                 runningProcess = removePriorityPriorityQueue(Process_queue);
                
-               /* MemBlock* allocate=allocateMem(mem,runningProcess.memsize,runningProcess.id);
-                if(!allocate)
+                MemBlock* allocate;
+                int flag = 0;
+                for (int i = 0; i < 4; i++)
+                {
+                    allocate = allocateMem(&mem->array[i],runningProcess.memsize,runningProcess.id);
+                    if (allocate){
+                        flag = 1;
+                        break;
+                    }
+                }
+                if(!flag)
                 {
                     enqueueCircularQueue(BlockList,runningProcess);
                     continue;
                 }
+            
                 runningProcess.memblock=allocate;
                 pcb[pcbidx].p.memblock = allocate;
-                MemLog(*allocate,getClk());*/
+                MemLog(*allocate,getClk());
                 pid = fork();
                 if (pid == 0)
                 {
@@ -169,8 +181,8 @@ void HPFhandler(int sig_num)
     pcb[pcbidx].WTA = pcb[pcbidx].TA/runningProcess.runtime;
     completed++;
     addToLog(pcb[pcbidx],getClk());  
-    /*
-    bool isfree= freeMem(mem,runningProcess.id);
+    
+    bool isfree= freeMem(mem->array,runningProcess.id);
     if(!isfree)
     {
         printf("Error freeing memory for process %d\n",runningProcess.id);
@@ -180,7 +192,7 @@ void HPFhandler(int sig_num)
     {
         struct Process blockedProcess=dequeueCircularQueue(BlockList);
         int memsize=blockedProcess.memsize;
-        MemBlock* allocate=allocateMem(mem,memsize,blockedProcess.id);
+        MemBlock* allocate=allocateMem(mem->array,memsize,blockedProcess.id);
         if(allocate)
         {
             MemLog(*allocate,getClk());
@@ -194,15 +206,14 @@ void HPFhandler(int sig_num)
             break;
         }
             
-    }*/
-        
+    }   
 }
 
 
 //////////////////////////////////// Round Robin ///////////////////////////////////////////////////////
 CircularQueue* RR_queue;
 int RR_completed = 0;
-struct Process RR_runningProcess = {0,0,0,0};
+struct Process RR_runningProcess = {0,0,0,0,0};
 bool Run = false;
 int RR_startTime = 0;
 int RR_current_pid = -1;
@@ -248,26 +259,67 @@ void RR(int process_count, int quantum) {
                 RR_pcb[pcbidx].WTA = RR_pcb[pcbidx].TA / RR_runningProcess.runtime;
                 RR_completed++;
                 RR_pcb[pcbidx].remainingtime = 0;
-                Run = false;    
-                addToLog(RR_pcb[pcbidx],getClk());        
-               
+                Run = false; 
+                bool allocate;
+                for (int i = 0; i < 4; i++)
+                {
+                    allocate = freeMem(&mem->array[i],runningProcess.id);
+                    if (allocate)
+                    {
+                        addToLog(RR_pcb[pcbidx],getClk());     
+                        MemLog(*RR_pcb[pcbidx].memblock,getClk());   
+                        break;
+                    }
+                }
             }
         }
 
-        if (!isCircularQueueEmpty(RR_queue)) {
+        if (!isCircularQueueEmpty(RR_queue) || !isCircularQueueEmpty(BlockList)) {
 
             if(!Run) {
                 util += getClk() - pausetime;          
                 RR_runningProcess = dequeueCircularQueue(RR_queue);
                 pcbidx = RR_runningProcess.id - 1;
-                Run = true;
                 current_time = getClk();
                 if(RR_pcb[pcbidx].remainingtime > quantum)
                     RR_startTime = current_time;
                 else
                     RR_startTime = current_time - (quantum - RR_pcb[pcbidx].remainingtime);
 
-                if(RR_pcb[pcbidx].processstate == stopped)
+                if (!isCircularQueueEmpty(BlockList))
+                {
+                    MemBlock* allocate;
+                    int flag = 0;
+                    for (int i = 0; i < 4; i++)
+                    {
+                        allocate = allocateMem(&mem->array[i],BlockList->array->memsize,BlockList->array->id);
+                        if (allocate){
+                            flag = 1;
+                            break;
+                        }
+                    }
+                    if(flag)
+                    {
+                        RR_runningProcess = dequeueCircularQueue(BlockList);
+                        pcbidx = RR_current_pid - 1;
+                        RR_pcb[pcbidx].current_pid = fork();
+
+                        if (RR_pcb[pcbidx].current_pid == 0) {
+                            char rt[10], id[10];
+                            sprintf(rt, "%d", RR_pcb[pcbidx].remainingtime);
+                            sprintf(id, "%d", RR_runningProcess.id);
+                            execl("./process.out", "./process.out", rt, id, NULL);
+                        }
+                        else {
+                            RR_pcb[pcbidx].waitingtime = current_time - RR_runningProcess.arrival_time;
+                            RR_pcb[pcbidx].processstate = running;
+                            RR_pcb[pcbidx].memblock = allocate;
+                            addToLog(RR_pcb[pcbidx],getClk());
+                            MemLog(*allocate,getClk());
+                        }
+                    }
+                }
+                else if (RR_pcb[pcbidx].processstate == stopped)
                 {
                     RR_pcb[pcbidx].processstate = resumed;
                     kill(RR_pcb[pcbidx].current_pid,SIGCONT);
@@ -275,7 +327,24 @@ void RR(int process_count, int quantum) {
                 }
                 else
                 {
+                    MemBlock* allocate;
+                    int flag = 0;
+                    for (int i = 0; i < 4; i++)
+                    {
+                        allocate = allocateMem(&mem->array[i],RR_runningProcess.memsize,RR_runningProcess.id);
+                        if (allocate){
+                            flag = 1;
+                            break;
+                        }
+                    }
+                    if(!flag)
+                    {
+                        enqueueCircularQueue(BlockList,runningProcess);
+                        continue;
+                    }
+
                     RR_pcb[pcbidx].current_pid = fork();
+
                     if (RR_pcb[pcbidx].current_pid == 0) {
                         char rt[10], id[10];
                         sprintf(rt, "%d", RR_pcb[pcbidx].remainingtime);
@@ -285,10 +354,12 @@ void RR(int process_count, int quantum) {
                     else {
                         RR_pcb[pcbidx].waitingtime = current_time - RR_runningProcess.arrival_time;
                         RR_pcb[pcbidx].processstate = running;
-                    
+                        RR_pcb[pcbidx].memblock = allocate;
+                        MemLog(*allocate,getClk());
                         addToLog(RR_pcb[pcbidx],getClk());
                     }
                 }
+                Run = true;
             }
         }
     }
@@ -478,3 +549,37 @@ void closeScheduler(int sig_num)
 	if no place found, return false
 	
 */
+
+//----------------------allocate memory block----------------------
+MemBlock* allocateMem(MemBlock* root, int size, int process_id)
+{ 
+    if(!root || !root->isFree || root->bytes < size)
+        return NULL;
+    //if size is exactly equal to block no need to split
+    int nearestPower = ceil(log2(size));
+    if(root->power == nearestPower && root->isFree)
+    {
+        root->isFree = false;
+        root->process_id = process_id;
+        return root;
+    }
+    // if not 
+    if(!root->isSplit)
+    {
+        root->left = createMemBlock(root->start, root->bytes/2, root->power - 1,root);
+        root->right = createMemBlock((root->left->end) + 1, root->bytes/2, root->power - 1,root);
+        root->isSplit = true;
+    }
+    // where to allocate check left first is free allocate no see right
+    MemBlock* found = allocateMem(root->left, size, process_id);
+    if(!found)
+    {
+        found = allocateMem(root->right, size, process_id);
+    }
+    if(found)
+    {
+        found->isFree = false;
+        found->process_id = process_id;
+    }
+    return found;
+}

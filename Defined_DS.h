@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 #ifndef Engine
 #define Engine
 typedef struct MemoryBlock MemBlock;
@@ -55,6 +56,7 @@ struct PCB
     double TA;
     double WTA;
     enum state processstate;
+    MemBlock* memblock;
 }PCB;     
 
 // Define process structure
@@ -284,11 +286,17 @@ TODO:
 3-check for free memory location in binary tree
 4-function to free memory
 */
-MemBlock* createMemBlock(int start,int size,MemBlock* parent)
+typedef struct MemTree {
+    MemBlock* array;
+    int size;
+    int capacity;
+} MemTree;
+
+MemBlock* createMemBlock(int start,int size,int power,MemBlock* parent)
 {
     MemBlock* newBlock = (MemBlock*)malloc(sizeof(MemBlock));
     newBlock->bytes = size;
-    newBlock->power = 0;
+    newBlock->power = power;
     newBlock->start = start;
     newBlock->end = start + size - 1;
     newBlock->process_id = -1; 
@@ -300,38 +308,26 @@ MemBlock* createMemBlock(int start,int size,MemBlock* parent)
     return newBlock;
 }
 
-//----------------------allocate memory block----------------------
-MemBlock* allocateMem(MemBlock* root, int size, int process_id)
-{ 
-    if(!root || !root->isFree || root->bytes < size)
-        return NULL;
-    //if size is exactly equal to block no need to split
-    if(root->bytes == size && root->isFree)
-    {
-        root->isFree = false;
-        root->process_id = process_id;
-        return root;
+MemTree* createMemTree()
+{
+    struct MemTree* newBlock = (struct MemTree*)malloc(sizeof(MemTree));
+    newBlock->array = (struct MemBlock*)malloc(sizeof(MemBlock) * 4);
+
+    for (int i = 0, startB = 0; i < 4; i++, startB += 256){
+        newBlock->array[i].bytes = 256;
+        newBlock->array[i].power = 8;
+        newBlock->array[i].start = startB;
+        newBlock->array[i].end = startB + 255;
+        newBlock->array[i].process_id = -1; 
+        newBlock->array[i].isSplit = false;
+        newBlock->array[i].isFree = true;
+        newBlock->array[i].left = NULL;
+        newBlock->array[i].right = NULL;
+        newBlock->array[i].parent = NULL;
     }
-    // if not 
-    if(!root->isSplit)
-    {
-        root->left = createMemBlock(root->start, root->bytes/2, root);
-        root->right = createMemBlock(root->start + root->bytes/2, root->bytes/2, root);
-        root->isSplit = true;
-    }
-    // where to allocate check left first is free allocate no see right
-    MemBlock* found = allocateMem(root->left, size, process_id);
-    if(!found)
-    {
-        found = allocateMem(root->right, size, process_id);
-    }
-    if(found)
-    {
-        found->isFree = false;
-        found->process_id = process_id;
-    }
-    return found;
+    return newBlock;
 }
+
 
 //----------------------check free  memory block----------------------
 bool areBuddiesFree(MemBlock* left, MemBlock* right) {

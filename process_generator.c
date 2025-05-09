@@ -80,11 +80,12 @@ int main(int argc, char* argv[]) {
         if (line[0] == '#')
             continue;
 
-        if (sscanf(line, "%d\t%d\t%d\t%d", 
+        if (sscanf(line, "%d\t%d\t%d\t%d\t%d", 
                    &processes[i].id, 
                    &processes[i].arrival_time, 
                    &processes[i].runtime, 
-                   &processes[i].priority) == 4) 
+                   &processes[i].priority,
+                   &processes[i].memsize) == 5) 
         {
             total_runtime += processes[i].runtime;
             i++;
