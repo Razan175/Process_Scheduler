@@ -4,12 +4,29 @@
 #include <stdbool.h>
 #ifndef Engine
 #define Engine
+typedef struct MemoryBlock MemBlock;
+
+typedef struct MemoryBlock
+{
+    int bytes;
+    int power;
+    int start;
+    int end;
+    int process_id;
+    bool isSplit;
+    bool isFree;
+    MemBlock* left;    
+    MemBlock* right;   
+    MemBlock* parent;  
+} MemBlock;
 
 typedef struct Process {
     int id;
     int arrival_time;
     int runtime;
     int priority;
+    int memsize;
+    MemBlock* memblock;
 } Process;
 
 struct msgbuff {
@@ -257,6 +274,110 @@ void destroyCircularQueue(CircularQueue* queue) {
         free(queue);
     }
 }
+/*
+TODO:
+1-create memory block 
+    1.1-adjust memory size of process
+    1.2-use memblock to  initialize all info inside 
+
+2- allocate memory for each process
+3-check for free memory location in binary tree
+4-function to free memory
+*/
+MemBlock* createMemBlock(int start,int size,MemBlock* parent)
+{
+    MemBlock* newBlock = (MemBlock*)malloc(sizeof(MemBlock));
+    newBlock->bytes = size;
+    newBlock->power = 0;
+    newBlock->start = start;
+    newBlock->end = start + size - 1;
+    newBlock->process_id = -1; 
+    newBlock->isSplit = false;
+    newBlock->isFree = true;
+    newBlock->left = NULL;
+    newBlock->right = NULL;
+    newBlock->parent = parent;
+    return newBlock;
+}
+
+//----------------------allocate memory block----------------------
+MemBlock* allocateMem(MemBlock* root, int size, int process_id)
+{ 
+    if(!root || !root->isFree || root->bytes < size)
+        return NULL;
+    //if size is exactly equal to block no need to split
+    if(root->bytes == size && root->isFree)
+    {
+        root->isFree = false;
+        root->process_id = process_id;
+        return root;
+    }
+    // if not 
+    if(!root->isSplit)
+    {
+        root->left = createMemBlock(root->start, root->bytes/2, root);
+        root->right = createMemBlock(root->start + root->bytes/2, root->bytes/2, root);
+        root->isSplit = true;
+    }
+    // where to allocate check left first is free allocate no see right
+    MemBlock* found = allocateMem(root->left, size, process_id);
+    if(!found)
+    {
+        found = allocateMem(root->right, size, process_id);
+    }
+    if(found)
+    {
+        found->isFree = false;
+        found->process_id = process_id;
+    }
+    return found;
+}
+
+//----------------------check free  memory block----------------------
+bool areBuddiesFree(MemBlock* left, MemBlock* right) {
+    return left && right && left->isFree && right->isFree &&
+           !left->isSplit && !right->isSplit;
+}
+
+//----------------------Merge free memory block----------------------
+void mergeMem(MemBlock* block) {
+    if (block == NULL || !block->isSplit) {
+        return;
+    }
+
+    MemBlock* left = block->left;
+    MemBlock* right = block->right;
+
+    if (areBuddiesFree(left, right)) {
+        left->isFree = true;
+        right->isFree = true;
+        left->process_id = -1;
+        right->process_id = -1;
+        block->isSplit = false;
+        free(left);
+        free(right);
+        block->left = NULL;
+        block->right = NULL;
+        mergeMem(block->parent); // recursive merge for bigger size(parent)
+    }
+}
+
+//----------------------Free memory block----------------------
+bool freeMem(MemBlock* root, int process_id) {
+    if (root == NULL) {
+        return false;
+    }
+    if (root->process_id == process_id) {
+        root->isFree = true;
+        root->process_id = -1;
+        mergeMem(root);
+        return true;
+    }
+    bool leftFreed = freeMem(root->left, process_id);
+    bool rightFreed = freeMem(root->right, process_id);
+    return leftFreed || rightFreed;
+}
+
 
 #endif
       

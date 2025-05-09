@@ -8,6 +8,7 @@ void closeScheduler(int sig_num);
 // -------------------  Output file functions-------------------
 void addToLog(struct PCB pbcblock,int time);
 void addToPerf(struct PCB* pcb, int process_count);
+void MemLog(struct MemoryBlock mem, int time);
 
 // -------------------  HPF functions---------------------------
 void HPF(int process_count);
@@ -22,12 +23,15 @@ void SRTN(int process_count);
 
 FILE *logFile;
 FILE *perfFile;
+FILE *MemFile;
 
 key_t msgkey; 
 int attach;
 
+CircularQueue *BlockList;
 struct PCB* pcb;
 struct PCB* RR_pcb;
+struct MemoryBlock* mem;
 
 double util = 0;
 int finish;
@@ -36,6 +40,7 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
 {
     initClk();
     signal(SIGINT,closeScheduler);
+    mem = createMemBlock(0, 1024, NULL);
 
     msgkey = ftok("keyfile",'p');
     attach = msgget(msgkey, 0666 | IPC_CREAT);
@@ -47,18 +52,20 @@ int main(int argc, char *argv[]) //1- alognumber,2- process_count,3- quantum
 
     logFile = fopen("scheduler.log", "w");
     perfFile = fopen("scheduler.perf", "w");
-    
+    MemFile = fopen("memory.log", "w");
 
-    if (logFile == NULL || perfFile == NULL) {
+
+    if (logFile == NULL || perfFile == NULL || MemFile == NULL) {
         perror("Error opening output files");
         msgctl(attach,IPC_RMID,NULL);
         exit(1);
     }
     
     fprintf(logFile,"#At time x process y state arr w total z remain y wait k\n");
-
+    fprintf(MemFile,"#At time x allocated y bytes for process z from i to j\n");
     int algo = atoi(argv[1]);
     int processes_count = atoi(argv[2]);
+    BlockList=createCircularQueue(processes_count);
 
 
     switch (algo)
@@ -92,7 +99,7 @@ int pausetime = 0;
 
 void HPF(int process_count)
 {
-      
+     completed = 0; 
     signal(SIGCHLD,HPFhandler);
     //tracks the number of processes that own a PCB  
     int pcbSize = 0;
@@ -108,7 +115,9 @@ void HPF(int process_count)
             insertPriorityPriorityQueue(Process_queue, newMessage.p);
             pcb[pcbSize].processstate = ready;                  //The test generator sets process ids from 1->process_count in order                                         
             pcb[pcbSize].remainingtime = newMessage.p.runtime;  //We will access PCB of a certain process through its id
-            pcb[pcbSize++].p = newMessage.p;    
+            pcb[pcbSize++].p = newMessage.p;  
+         // newMessage.p.memblock = createMemBlock(0,newMessage.p.memsize,NULL);                    
+          // newMessage.p.memsize=64;
         }
 
         if (Process_queue->size > 0)
@@ -117,6 +126,16 @@ void HPF(int process_count)
             if (pcb[pcbidx].processstate == finished || pcb[pcbidx].processstate == ready)   {
                 util += getClk() - pausetime;
                 runningProcess = removePriorityPriorityQueue(Process_queue);
+               
+               /* MemBlock* allocate=allocateMem(mem,runningProcess.memsize,runningProcess.id);
+                if(!allocate)
+                {
+                    enqueueCircularQueue(BlockList,runningProcess);
+                    continue;
+                }
+                runningProcess.memblock=allocate;
+                pcb[pcbidx].p.memblock = allocate;
+                MemLog(*allocate,getClk());*/
                 pid = fork();
                 if (pid == 0)
                 {
@@ -149,7 +168,34 @@ void HPFhandler(int sig_num)
     pcb[pcbidx].TA = pcb[pcbidx].finishedtime - runningProcess.arrival_time ;
     pcb[pcbidx].WTA = pcb[pcbidx].TA/runningProcess.runtime;
     completed++;
-    addToLog(pcb[pcbidx],getClk());    
+    addToLog(pcb[pcbidx],getClk());  
+    /*
+    bool isfree= freeMem(mem,runningProcess.id);
+    if(!isfree)
+    {
+        printf("Error freeing memory for process %d\n",runningProcess.id);
+    }
+    int blockcount=BlockList->size;
+    for(int i=0;i<blockcount;i++)
+    {
+        struct Process blockedProcess=dequeueCircularQueue(BlockList);
+        int memsize=blockedProcess.memsize;
+        MemBlock* allocate=allocateMem(mem,memsize,blockedProcess.id);
+        if(allocate)
+        {
+            MemLog(*allocate,getClk());
+            blockedProcess.memblock=allocate;
+            insertPriorityPriorityQueue(Process_queue,blockedProcess);
+            break;
+        }
+        else
+        {
+            enqueueCircularQueue(BlockList,blockedProcess);
+            break;
+        }
+            
+    }*/
+        
 }
 
 
@@ -297,6 +343,23 @@ void addToLog(struct PCB pcblock, int time)
     
     fprintf(logFile,"\n");
 }
+void MemLog(struct MemoryBlock mem, int time)
+{
+    //#At time x allocated y bytes for process z from i to j
+     int size = mem.bytes;
+     int start = mem.start;
+     int end = mem.end;
+     int process_id = mem.process_id;
+   
+     if (mem.isFree)
+     {
+         fprintf(MemFile, "At time %d freed %d bytes from %d to %d\n", time, size, start, end);
+     }
+     else
+     {
+         fprintf(MemFile, "At time %d allocated %d bytes for process %d from %d to %d\n", time, size, process_id, start, end);
+     }
+}
 
 void addToPerf(struct PCB *pcb, int process_count)
 {
@@ -334,10 +397,13 @@ void addToPerf(struct PCB *pcb, int process_count)
 void closeScheduler(int sig_num)
 {
     printf("Cleaning up resources as Scheduler\n");
+
     if(logFile)
         fclose(logFile);
     if(perfFile)
         fclose(perfFile);
+    if(MemFile)
+        fclose(MemFile);
 
     if(pcb)
         free(pcb);
@@ -350,7 +416,65 @@ void closeScheduler(int sig_num)
     destroyClk(false);
     
     destroyCircularQueue(RR_queue);
-
+    destroyCircularQueue(BlockList);
     if(RR_pcb)
          free(RR_pcb);
 }
+/*
+	TODO:
+	1- Update test_generator.c to include memsize
+	2- Make a memory log output file
+	3- every time we fork in any algorithm, we check if there is enough memory (out of 1024 bytes total)
+	4- if yes, we call the buddy system function
+	5- if no, the process will be added to a blocked list
+	6- Every time we free memory, We check the blocked list if there is memory for the oldest process
+	7- if yes, then this process should fork next (not sure)
+
+
+
+	buddy function:
+	bool buddy(int size);
+	msh 3arfa if its real malloc or if its a shared memory wla eh bzabt
+	probably binary tree array
+
+	Struct MemoryBlock
+	{
+		int bytes;
+		int power;
+		int start;
+		int end;
+		int process id;
+		bool isSplit;
+		bool isFree;
+	}
+
+	We'll get the closest power of 2 of the size (ex: if size =30, closest power of 2 is 32, we want log base 2 of 32)
+	closest power = ceil(log(size,2))
+	we have total of 1024 bytes
+	the maximum a process can have is 256 bytes, so we can start with 4 256byte blocks in an array
+	MemoryBlock[0] = {256,8,0,255,false,false}
+	MemoryBlock[1] = {256,8,256,511,false,false} and so on
+	for each block:
+	if (memory block isFree && memory block is not split && memory block power == closest power)
+	{
+		give this memory block to the process
+		isSplit = true
+		isFree = false
+	}
+	else if (memory block isFree && memory block is not split && memory block power != closest power)
+	{
+		split block
+		recursively call this function on the left child
+		isSplit = true;
+		isFree = false;
+	}
+	else if (memory block is split && memory block power != closest power)
+	{
+		recursively call this function on the left subtree
+		if false, recursively call this function on the right subtree
+	}
+	else, look at the other 256 blocks
+
+	if no place found, return false
+	
+*/
