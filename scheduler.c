@@ -263,7 +263,8 @@ void RR(int process_count, int quantum) {
                 bool allocate;
                 for (int i = 0; i < 4; i++)
                 {
-                    allocate = freeMem(&mem->array[i],runningProcess.id);
+                    //printf("%d\n",i);
+                    allocate = freeMem(&mem->array[i],RR_runningProcess.id);
                     if (allocate)
                     {
                         addToLog(RR_pcb[pcbidx],getClk());     
@@ -294,7 +295,6 @@ void RR(int process_count, int quantum) {
                     {
                         allocate = allocateMem(&mem->array[i],BlockList->array->memsize,BlockList->array->id);
                         if (allocate != NULL){
-                            printTree("|    ",&mem->array[0],false);
                             flag = 1;
                             break;
                         }
@@ -340,10 +340,9 @@ void RR(int process_count, int quantum) {
                     }
                     if(!flag)
                     {
-                        enqueueCircularQueue(BlockList,runningProcess);
+                        enqueueCircularQueue(BlockList,RR_runningProcess);
                         continue;
                     }
-                    printTree("|    ",&mem->array[0],false);
 
                     RR_pcb[pcbidx].current_pid = fork();
 

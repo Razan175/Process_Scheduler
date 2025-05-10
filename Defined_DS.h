@@ -360,33 +360,36 @@ void mergeMem(MemBlock* block) {
 
 //----------------------Free memory block----------------------
 bool freeMem(MemBlock* root, int process_id) {
+
     if (root == NULL) {
         return false;
     }
+
     if (root->process_id == process_id) {
         root->isFree = true;
         root->process_id = -1;
+        
         return true;
     }
-    if (root->left->process_id == process_id) {
+    if (!root->left && root->left->process_id == process_id) {
         root->left->isFree = true;
         root->left->process_id = -1;
         root->left = NULL;
-        if (root->right->isFree)
+        if (!root->right && root->right->isFree)
         {
-            root->isSplit = true;
+            root->isSplit = false;
             
         }
         //mergeMem(root);
         return true;
     }
-    else if (root->right->process_id == process_id) {
+    else if (!root->right && root->right->process_id == process_id) {
         root->right->isFree = true;
         root->right->process_id = -1;
         root->right = NULL;
-        if (root->left->isFree)
+        if (!root->left && root->left->isFree)
         {
-            root->isSplit = true;
+            root->isSplit = false;
             
         }
         //mergeMem(root);
@@ -401,19 +404,21 @@ void printTree(char* prefix ,MemBlock * Node,bool isleft)
 {
     if( Node != NULL)
     {
-        if(!prefix)
+
         {
-            printf("Root: ");
+            printf("%d",Node->bytes);
         }
+
+        char* newPrefix = prefix;
+        printTree(newPrefix,Node->left,true);
+        printTree(newPrefix,Node->right,false);
     }
     else
     {
-        printf("%s%s",prefix,isleft?"L--" : "R--");
+        return;
+        //printf("root is empty\n");
     }
-
-    char* newPrefix = prefix;
-    printTree(newPrefix,Node->left,true);
-    printTree(newPrefix,Node->right,false);
+    return;
     
 }
 #endif
