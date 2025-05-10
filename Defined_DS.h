@@ -366,7 +366,30 @@ bool freeMem(MemBlock* root, int process_id) {
     if (root->process_id == process_id) {
         root->isFree = true;
         root->process_id = -1;
-        mergeMem(root);
+        return true;
+    }
+    if (root->left->process_id == process_id) {
+        root->left->isFree = true;
+        root->left->process_id = -1;
+        root->left = NULL;
+        if (root->right->isFree)
+        {
+            root->isSplit = true;
+            
+        }
+        //mergeMem(root);
+        return true;
+    }
+    else if (root->right->process_id == process_id) {
+        root->right->isFree = true;
+        root->right->process_id = -1;
+        root->right = NULL;
+        if (root->left->isFree)
+        {
+            root->isSplit = true;
+            
+        }
+        //mergeMem(root);
         return true;
     }
     bool leftFreed = freeMem(root->left, process_id);
@@ -374,6 +397,24 @@ bool freeMem(MemBlock* root, int process_id) {
     return leftFreed || rightFreed;
 }
 
+void printTree(char* prefix ,MemBlock * Node,bool isleft)
+{
+    if( Node != NULL)
+    {
+        if(!prefix)
+        {
+            printf("Root: ");
+        }
+    }
+    else
+    {
+        printf("%s%s",prefix,isleft?"L--" : "R--");
+    }
 
+    char* newPrefix = prefix;
+    printTree(newPrefix,Node->left,true);
+    printTree(newPrefix,Node->right,false);
+    
+}
 #endif
       

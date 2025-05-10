@@ -293,7 +293,8 @@ void RR(int process_count, int quantum) {
                     for (int i = 0; i < 4; i++)
                     {
                         allocate = allocateMem(&mem->array[i],BlockList->array->memsize,BlockList->array->id);
-                        if (allocate){
+                        if (allocate != NULL){
+                            printTree("|    ",&mem->array[0],false);
                             flag = 1;
                             break;
                         }
@@ -332,7 +333,7 @@ void RR(int process_count, int quantum) {
                     for (int i = 0; i < 4; i++)
                     {
                         allocate = allocateMem(&mem->array[i],RR_runningProcess.memsize,RR_runningProcess.id);
-                        if (allocate){
+                        if (allocate != NULL){
                             flag = 1;
                             break;
                         }
@@ -342,6 +343,7 @@ void RR(int process_count, int quantum) {
                         enqueueCircularQueue(BlockList,runningProcess);
                         continue;
                     }
+                    printTree("|    ",&mem->array[0],false);
 
                     RR_pcb[pcbidx].current_pid = fork();
 
@@ -553,7 +555,7 @@ void closeScheduler(int sig_num)
 //----------------------allocate memory block----------------------
 MemBlock* allocateMem(MemBlock* root, int size, int process_id)
 { 
-    if(!root || !root->isFree || root->bytes < size)
+    if(!root || !(root->isFree) || root->bytes < size)
         return NULL;
     //if size is exactly equal to block no need to split
     int nearestPower = ceil(log2(size));
@@ -564,7 +566,7 @@ MemBlock* allocateMem(MemBlock* root, int size, int process_id)
         return root;
     }
     // if not 
-    if(!root->isSplit)
+    if(!(root->isSplit))
     {
         root->left = createMemBlock(root->start, root->bytes/2, root->power - 1,root);
         root->right = createMemBlock((root->left->end) + 1, root->bytes/2, root->power - 1,root);
