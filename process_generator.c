@@ -188,7 +188,9 @@ void clearResources(int signum)
     //TODO Clears all resources in case of interruption
 
     //wait for the scheduler to finish
-    waitpid(scheduler_pid, &status, 0);
+    do
+    waitpid(scheduler_pid, &status, WNOHANG);
+    while(WIFEXITED(status) != 1);
 
     printf("Cleaning up resources as Process generator...\n");
 

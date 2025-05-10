@@ -362,19 +362,22 @@ void mergeMem(MemBlock* block) {
 bool freeMem(MemBlock* root, int process_id) {
 
     if (root == NULL) {
+        printf("couldn't free\n");
         return false;
     }
 
     if (root->process_id == process_id) {
         root->isFree = true;
         root->process_id = -1;
-        
+        printf("Memblock freed %d %d %d\n",root->bytes,root->start, root->end);
         return true;
     }
     if (!root->left && root->left->process_id == process_id) {
         root->left->isFree = true;
         root->left->process_id = -1;
-        root->left = NULL;
+        //root->left = NULL;
+        free(root->left);
+        printf("Memblock found %d %d %d\n",root->bytes,root->start, root->end);
         if (!root->right && root->right->isFree)
         {
             root->isSplit = false;
@@ -386,12 +389,14 @@ bool freeMem(MemBlock* root, int process_id) {
     else if (!root->right && root->right->process_id == process_id) {
         root->right->isFree = true;
         root->right->process_id = -1;
-        root->right = NULL;
+        //root->right = NULL;
+        printf("Memblock found %d %d %d\n",root->bytes,root->start, root->end);
         if (!root->left && root->left->isFree)
         {
             root->isSplit = false;
             
         }
+        free(root->right);
         //mergeMem(root);
         return true;
     }
