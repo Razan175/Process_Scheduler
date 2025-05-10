@@ -147,8 +147,8 @@ void HPF(int process_count)
                     continue;
                 }
             
-                runningProcess.memblock=allocate;
-                pcb[pcbidx].p.memblock = allocate;
+                runningProcess.memblock= *allocate;
+                pcb[pcbidx].p.memblock =*allocate;
                 MemLog(*allocate,getClk());
                 pid = fork();
                 if (pid == 0)
@@ -199,7 +199,7 @@ void HPFhandler(int sig_num)
         if(allocate)
         {
             MemLog(*allocate,getClk());
-            blockedProcess.memblock=allocate;
+            blockedProcess.memblock=*allocate;
             insertPriorityPriorityQueue(Process_queue,blockedProcess);
             break;
         }
@@ -224,7 +224,7 @@ void RR(int process_count, int quantum) {
     RR_queue = createCircularQueue(process_count);
     RR_pcb = (struct PCB*)malloc(sizeof(PCB) * process_count);
     memset(RR_pcb, 0, sizeof(PCB) * process_count);
-    printf("%d\n",process_count);
+
     while (RR_completed < process_count) {
 
         while (msgrcv(attach, &newMessage, sizeof(newMessage.p), 0, IPC_NOWAIT) != -1) {
@@ -233,13 +233,17 @@ void RR(int process_count, int quantum) {
             RR_pcb[idx].remainingtime = newMessage.p.runtime;
             RR_pcb[idx].processstate = ready;
             enqueueCircularQueue(RR_queue, newMessage.p);
+            printf("process %d received\n",newMessage.p.id);
         }
 
         int current_time = getClk();
     
         if(Run && (current_time - RR_startTime >= quantum)) {
             if (RR_pcb[pcbidx].remainingtime > quantum)
+            {
+                printf("to be stopped: %d, Scheduler: %d\n",RR_pcb[pcbidx].current_pid, getpid());
                 kill(RR_pcb[pcbidx].current_pid, SIGSTOP);
+            }
 
             int t;
             pausetime = getClk();
@@ -263,44 +267,37 @@ void RR(int process_count, int quantum) {
                 printf("process finished = %d\n",RR_runningProcess.id);
                 RR_pcb[pcbidx].remainingtime = 0;
                 Run = false; 
-                bool allocate;
+                bool allocate = false;
                 for (int i = 0; i < 4; i++)
                 {
                     //printf("%d\n",i);
-                    if(!allocate)
-                        allocate = freeMem(&mem->array[i],RR_runningProcess.id);
+                   // if(!allocate)
+                    allocate = freeMem(&mem->array[i],RR_runningProcess.id);
                     if (allocate)
                     {
                         printf("Block found in arr %d\n",i);
+                        break;
                     }
                 }
-                addToLog(RR_pcb[pcbidx],getClk());     
-                MemLog(*RR_pcb[pcbidx].memblock,getClk());   
+                RR_pcb[pcbidx].memblock.isFree = true;
+                addToLog(RR_pcb[pcbidx],getClk());   
+                //printTree(&mem->array[1]); 
+                MemLog(RR_pcb[pcbidx].memblock,getClk());   
             }
         }
 
-        if (!isCircularQueueEmpty(RR_queue) || !isCircularQueueEmpty(BlockList)) {
-
-            if(!Run) {
-                util += getClk() - pausetime;          
-                RR_runningProcess = dequeueCircularQueue(RR_queue);
-                pcbidx = RR_runningProcess.id - 1;
-                current_time = getClk();
-                if(RR_pcb[pcbidx].remainingtime > quantum)
-                    RR_startTime = current_time;
-                else
-                    RR_startTime = current_time - (quantum - RR_pcb[pcbidx].remainingtime);
-                if (!isCircularQueueEmpty(BlockList))
-                {
+        if (!isCircularQueueEmpty(BlockList) && !Run)
+        {
+            printf("Blcoklist\n");
                     MemBlock* allocate;
                     int flag = 0;
                     for (int i = 0; i < 4; i++)
                     {
-                        if(!flag)
-                            allocate = allocateMem(&mem->array[i],BlockList->array->memsize,BlockList->array->id);
+                        //if(!flag)
+                        allocate = allocateMem(&mem->array[i],BlockList->array->memsize,BlockList->array->id);
                         if (allocate != NULL){
                             flag = 1;
-                            //break;
+                            break;
                         }
                     }
                     if(flag)
@@ -318,17 +315,33 @@ void RR(int process_count, int quantum) {
                         else {
                             RR_pcb[pcbidx].waitingtime = current_time - RR_runningProcess.arrival_time;
                             RR_pcb[pcbidx].processstate = running;
-                            RR_pcb[pcbidx].memblock = allocate;
+                            RR_pcb[pcbidx].memblock = *allocate;
+                            Run = true;
                             addToLog(RR_pcb[pcbidx],getClk());
-                            MemLog(*RR_pcb[pcbidx].memblock,getClk());
+                            //printTree(&mem->array[1]);
+                            MemLog(RR_pcb[pcbidx].memblock,getClk());
                         }
                     }
-                } 
-                else if (RR_pcb[pcbidx].processstate == stopped)
+        } 
+
+        if (!isCircularQueueEmpty(RR_queue)) {
+            if(!Run) {
+                util += getClk() - pausetime;          
+                RR_runningProcess = dequeueCircularQueue(RR_queue);
+                pcbidx = RR_runningProcess.id - 1;
+                current_time = getClk();
+                if(RR_pcb[pcbidx].remainingtime > quantum)
+                    RR_startTime = current_time;
+                else
+                    RR_startTime = current_time - (quantum - RR_pcb[pcbidx].remainingtime);
+
+                
+                if (RR_pcb[pcbidx].processstate == stopped)
                 {
                     Run = true;
                     printf("%d resumed\n",RR_runningProcess.id);
                     RR_pcb[pcbidx].processstate = resumed;
+                    printf("to be continued: %d, Scheduler: %d\n",RR_pcb[pcbidx].current_pid, getpid());
                     kill(RR_pcb[pcbidx].current_pid,SIGCONT);
                     addToLog(RR_pcb[pcbidx],getClk());      
                 }
@@ -338,10 +351,11 @@ void RR(int process_count, int quantum) {
                     int flag = 0;
                     for (int i = 0; i < 4; i++)
                     {
-                        if (flag == 0)
-                            allocate = allocateMem(&mem->array[i],RR_runningProcess.memsize,RR_runningProcess.id);
+                        //if (flag == 0)
+                        allocate = allocateMem(&mem->array[i],RR_runningProcess.memsize,RR_runningProcess.id);
                         if (allocate != NULL){
                             flag = 1;
+                            break;
                         }
                     }
                     
@@ -363,8 +377,9 @@ void RR(int process_count, int quantum) {
                     {
                         RR_pcb[pcbidx].waitingtime = current_time - RR_runningProcess.arrival_time;
                         RR_pcb[pcbidx].processstate = running;
-                        RR_pcb[pcbidx].memblock = allocate;
-                        MemLog(*RR_pcb[pcbidx].memblock,getClk());
+                        RR_pcb[pcbidx].memblock = *allocate;
+                        //printTree(&mem->array[1]);
+                        MemLog(RR_pcb[pcbidx].memblock,getClk());
                         addToLog(RR_pcb[pcbidx],getClk());
                     }
                 }
@@ -501,12 +516,14 @@ void closeScheduler(int sig_num)
     if(attach != -1)
         msgctl(attach,IPC_RMID,NULL);
         
-    destroyClk(false);
+    destroyClk(true);
     
     destroyCircularQueue(RR_queue);
     destroyCircularQueue(BlockList);
     if(RR_pcb)
          free(RR_pcb);
+
+    exit(0);
 }
 /*
 	TODO:
@@ -572,11 +589,14 @@ MemBlock* allocateMem(MemBlock* root, int size, int process_id)
 { 
     if(!root || !(root->isFree) || root->bytes < size)
     {
-        printf("Mem block not found\n");
+        if(root)
+            printf("Memblock Not found %d %d %d\n",root->bytes,root->start, root->end);
+        else
+            printf("Mem block not found\n");
         return NULL;
     }
     //if size is exactly equal to block no need to split
-    int nearestPower = ceil(log2(size));
+    int nearestPower = (int)(ceil(log2(size)));
     if(root->power == nearestPower && root->isFree && !root->isSplit)
     {
         root->isFree = false;
@@ -588,15 +608,16 @@ MemBlock* allocateMem(MemBlock* root, int size, int process_id)
     if(!(root->isSplit) && root->isFree)
     {
         if(!root->left)
-            root->left = createMemBlock(root->start, root->bytes/2, root->power - 1,root);
-        if(!root->left)
-            root->right = createMemBlock((root->left->end) + 1, root->bytes/2, root->power - 1,root);
+            root->left = createMemBlock(root->start, root->bytes/2, root->power - 1);
+        if(!root->right)
+            root->right = createMemBlock((root->left->end) + 1, root->bytes/2, root->power - 1);
         root->isSplit = true;
     }
     // where to allocate check left first is free allocate no see right
     MemBlock* found = allocateMem(root->left, size, process_id);
     if(!found)
         found = allocateMem(root->right, size, process_id);
+    if(found)
+        root->isSplit = true;
     return found;
-    
 }

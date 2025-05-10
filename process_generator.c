@@ -186,11 +186,11 @@ int main(int argc, char* argv[]) {
 void clearResources(int signum) 
 {
     //TODO Clears all resources in case of interruption
-
+    status = -1;
     //wait for the scheduler to finish
     do
-    waitpid(scheduler_pid, &status, WNOHANG);
-    while(WIFEXITED(status) != 1);
+        waitpid(scheduler_pid, &status, 0);
+    while(!WIFEXITED(status));
 
     printf("Cleaning up resources as Process generator...\n");
 
@@ -200,7 +200,7 @@ void clearResources(int signum)
         free(processes);
         
     // 7. Clear clock resources
-    destroyClk(true);
+    destroyClk(false);
     waitpid(clk_pid, &status, 0);
 
     exit(EXIT_SUCCESS);
