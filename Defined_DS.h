@@ -18,7 +18,8 @@ typedef struct MemoryBlock
     bool isFree;
     MemBlock* left;    
     MemBlock* right;   
-} MemBlock;
+}MemBlock;
+
 
 typedef struct Process {
     int id;
@@ -55,7 +56,7 @@ struct PCB
     double TA;
     double WTA;
     enum state processstate;
-    MemBlock memblock;
+    MemBlock* memblock;
 }PCB;     
 
 // Define process structure
@@ -285,11 +286,6 @@ TODO:
 3-check for free memory location in binary tree
 4-function to free memory
 */
-typedef struct MemTree {
-    MemBlock* array;
-    int size;
-    int capacity;
-} MemTree;
 
 MemBlock* createMemBlock(int start,int size,int power)
 {
@@ -303,25 +299,6 @@ MemBlock* createMemBlock(int start,int size,int power)
     newBlock->isFree = true;
     newBlock->left = NULL;
     newBlock->right = NULL;
-    return newBlock;
-}
-
-struct MemTree* createMemTree()
-{
-    struct MemTree* newBlock = (struct MemTree*)malloc(sizeof(MemTree));
-    newBlock->array = (struct MemBlock*)malloc(sizeof(MemBlock) * 4);
-
-    for (int i = 0, startB = 0; i < 4; i++, startB += 256){
-        newBlock->array[i].bytes = 256;
-        newBlock->array[i].power = 8;
-        newBlock->array[i].start = startB;
-        newBlock->array[i].end = startB + 255;
-        newBlock->array[i].process_id = -1; 
-        newBlock->array[i].isSplit = false;
-        newBlock->array[i].isFree = true;
-        newBlock->array[i].left = NULL;
-        newBlock->array[i].right = NULL;
-    }
     return newBlock;
 }
 
@@ -353,61 +330,6 @@ void mergeMem(MemBlock* block) {
         block->right = NULL;
         //mergeMem(block->parent); // recursive merge for bigger size(parent)
     }
-}
-
-//----------------------Free memory block----------------------
-bool freeMem(MemBlock* root, int process_id) {
-
-    if (root == NULL) {
-        printf("couldn't free\n");
-        return false;
-    }
-
-    if (root->process_id == process_id) {
-        root->isFree = true;
-        root->process_id = -1;
-        printf("Memblock freed %d %d %d\n",root->bytes,root->start, root->end);
-        return true;
-    }
-   
-    if ((root->left != NULL)&& (root->left->process_id == process_id)) {
-        
-        root->left->isFree = true;
-        root->left->process_id = -1;
-        //free(root->left);
-        
-        //root->left = NULL;
-        
-        if ((root->right && root->right->isFree) || root->right == NULL)
-            root->isSplit = false;
-        //mergeMem(root);
-        return true;
-    }
-    else if ((root->right != NULL) && root->right->process_id == process_id) {
-        root->right->isFree = true;
-        root->right->process_id = -1;
-        //free(root->right);
-        //root->right = NULL;
-
-        printf("Memblock freed %d %d %d\n",root->bytes,root->start, root->end);
-        if ((root->left && root->left->isFree )|| (root->right == NULL))
-        {
-            root->isSplit = false;
-            
-        }
-
-        //mergeMem(root);
-        return true;
-    }
-    bool leftFreed = freeMem(root->left, process_id);
-    bool rightFreed = freeMem(root->right, process_id);
-    //recursively checking isSplit (ex if 32 is freed, we must check if its parent 64 is still split then check if 128 is still split and so on)
-    if (leftFreed || rightFreed)
-    {
-        if (((root->right && root->right->isFree) || root->right == NULL) && ((root->left && root->left->isFree )|| (root->right == NULL)))
-            root->isSplit = false;
-    }
-    return leftFreed || rightFreed;
 }
 
 #endif

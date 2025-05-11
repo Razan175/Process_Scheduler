@@ -17,8 +17,8 @@ void ProcessCompleted(int signum);
 int msgQid;
 Process* processes;
 int total_runtime = 0;
-int scheduler_pid;
-int clk_pid;
+int scheduler_pid = -1;
+int clk_pid = -1;
 int CompletedByScheduler = 0;
 int status = 0;
 
@@ -104,10 +104,16 @@ int main(int argc, char* argv[]) {
     fprintf(stdout,"Please enter the algorithm you want to use ([1] Round Robin [2] SRTN [3] HPF):\n");
     scanf("%d",&algo_num);
 
-    while (algo_num > 3 && algo_num < 1)
+    while (algo_num > 3 || algo_num < 1)
         fprintf(stdout,"Please enter a valid number([1] Round Robin [2] SRTN [3] HPF):\n");
 
     int quantum;
+
+    if(algo_num == 2)
+    {
+        printf("Sorry, SRTN is not yet Supported.\n");
+        return EXIT_FAILURE;
+    }
 
     if (algo_num == 1)
     {
@@ -118,6 +124,7 @@ int main(int argc, char* argv[]) {
         }
         while (quantum < 0);
     }
+
     // 3. Initiate and create the scheduler and clock processes.   
     char quantum_str[10];
     if (algo_num == 1)
@@ -175,7 +182,6 @@ int main(int argc, char* argv[]) {
         } else {
             printf("Sent Process %d to scheduler at time %d\n", processes[i].id,getClk());
         }
-
     }
 
     raise(SIGINT);
@@ -186,11 +192,12 @@ int main(int argc, char* argv[]) {
 void clearResources(int signum) 
 {
     //TODO Clears all resources in case of interruption
-    status = -1;
+
     //wait for the scheduler to finish
-    do
-        waitpid(scheduler_pid, &status, 0);
-    while(!WIFEXITED(status));
+    if(scheduler_pid != -1)
+        do
+            waitpid(scheduler_pid, &status, 0);
+        while(!WIFEXITED(status));
 
     printf("Cleaning up resources as Process generator...\n");
 
@@ -200,8 +207,9 @@ void clearResources(int signum)
         free(processes);
         
     // 7. Clear clock resources
-    destroyClk(false);
-    waitpid(clk_pid, &status, 0);
+    if (clk_pid){
+        destroyClk(true);
+        waitpid(clk_pid, &status, 0);}
 
     exit(EXIT_SUCCESS);
 }
