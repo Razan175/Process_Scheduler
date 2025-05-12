@@ -1,17 +1,17 @@
 #At time x allocated y bytes for process z from i to j
-At time 5 allocated 256 bytes for process 1 from 0 to 255
-At time 12 freed 256 bytes from 0 to 255
-At time 14 allocated 64 bytes for process 2 from 0 to 63
-At time 16 freed 64 bytes from 0 to 63
-At time 24 allocated 256 bytes for process 4 from 0 to 255
-At time 29 freed 256 bytes from 0 to 255
-At time 29 allocated 128 bytes for process 3 from 0 to 127
-At time 43 freed 128 bytes from 0 to 127
-At time 43 allocated 128 bytes for process 6 from 0 to 127
-At time 55 freed 128 bytes from 0 to 127
-At time 55 allocated 128 bytes for process 8 from 0 to 127
-At time 71 freed 128 bytes from 0 to 127
-At time 71 allocated 128 bytes for process 7 from 0 to 127
-At time 93 freed 128 bytes from 0 to 127
-At time 93 allocated 256 bytes for process 5 from 0 to 255
-At time 119 freed 256 bytes from 0 to 255
+At time 1 allocated 256 bytes for process 1 from 0 to 255
+At time 1 allocated 64 bytes for process 2 from 256 to 319
+At time 1 allocated 256 bytes for process 3 from 512 to 767
+At time 1 allocated 256 bytes for process 4 from 768 to 1023
+At time 1 allocated 128 bytes for process 6 from 384 to 511
+At time 7 freed 64 bytes from 256 to 319
+At time 22 freed 256 bytes from 0 to 255
+At time 22 allocated 256 bytes for process 5 from 0 to 255
+At time 22 allocated 128 bytes for process 7 from 256 to 383
+At time 48 freed 256 bytes from 768 to 1023
+At time 48 allocated 256 bytes for process 8 from 768 to 1023
+At time 52 freed 128 bytes from 384 to 511
+At time 62 freed 256 bytes from 512 to 767
+At time 102 freed 256 bytes from 768 to 1023
+At time 108 freed 128 bytes from 256 to 383
+At time 110 freed 256 bytes from 0 to 255
