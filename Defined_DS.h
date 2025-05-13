@@ -276,16 +276,6 @@ void destroyCircularQueue(CircularQueue* queue) {
         free(queue);
     }
 }
-/*
-TODO:
-1-create memory block 
-    1.1-adjust memory size of process
-    1.2-use memblock to  initialize all info inside 
-
-2- allocate memory for each process
-3-check for free memory location in binary tree
-4-function to free memory
-*/
 
 MemBlock* createMemBlock(int start,int size,int power)
 {
