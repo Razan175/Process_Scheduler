@@ -2,14 +2,32 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 #ifndef Engine
 #define Engine
+typedef struct MemoryBlock MemBlock;
+
+typedef struct MemoryBlock
+{
+    int bytes;
+    int power;
+    int start;
+    int end;
+    int process_id;
+    bool isSplit;
+    bool isFree;
+    MemBlock* left;    
+    MemBlock* right;   
+}MemBlock;
+
 
 typedef struct Process {
     int id;
     int arrival_time;
     int runtime;
     int priority;
+    int memsize;
+    MemBlock memblock;
 } Process;
 
 struct msgbuff {
@@ -38,6 +56,7 @@ struct PCB
     double TA;
     double WTA;
     enum state processstate;
+    MemBlock* memblock;
 }PCB;     
 
 // Define process structure
@@ -255,6 +274,51 @@ void destroyCircularQueue(CircularQueue* queue) {
             free(queue->array);
         }
         free(queue);
+    }
+}
+
+MemBlock* createMemBlock(int start,int size,int power)
+{
+    MemBlock* newBlock = (MemBlock*)malloc(sizeof(MemBlock));
+    newBlock->bytes = size;
+    newBlock->power = power;
+    newBlock->start = start;
+    newBlock->end = start + size - 1;
+    newBlock->process_id = -1; 
+    newBlock->isSplit = false;
+    newBlock->isFree = true;
+    newBlock->left = NULL;
+    newBlock->right = NULL;
+    return newBlock;
+}
+
+
+//----------------------check free  memory block----------------------
+bool areBuddiesFree(MemBlock* left, MemBlock* right) {
+    return left && right && left->isFree && right->isFree &&
+           !left->isSplit && !right->isSplit;
+}
+
+//----------------------Merge free memory block----------------------
+void mergeMem(MemBlock* block) {
+    if (block == NULL || !block->isSplit) {
+        return;
+    }
+
+    MemBlock* left = block->left;
+    MemBlock* right = block->right;
+
+    if (areBuddiesFree(left, right)) {
+        left->isFree = true;
+        right->isFree = true;
+        left->process_id = -1;
+        right->process_id = -1;
+        block->isSplit = false;
+        free(left);
+        free(right);
+        block->left = NULL;
+        block->right = NULL;
+        //mergeMem(block->parent); // recursive merge for bigger size(parent)
     }
 }
 

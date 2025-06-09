@@ -1,0 +1,17 @@
+#At time x allocated y bytes for process z from i to j
+At time 0 allocated 256 bytes for process 1 from 0 to 255
+At time 0 allocated 64 bytes for process 2 from 256 to 319
+At time 0 allocated 256 bytes for process 3 from 512 to 767
+At time 0 allocated 256 bytes for process 4 from 768 to 1023
+At time 0 allocated 128 bytes for process 6 from 384 to 511
+At time 3 freed 64 bytes from 256 to 319
+At time 13 freed 256 bytes from 768 to 1023
+At time 13 allocated 256 bytes for process 8 from 768 to 1023
+At time 13 allocated 128 bytes for process 7 from 256 to 383
+At time 29 freed 256 bytes from 768 to 1023
+At time 29 allocated 256 bytes for process 5 from 768 to 1023
+At time 41 freed 128 bytes from 384 to 511
+At time 55 freed 256 bytes from 512 to 767
+At time 62 freed 256 bytes from 0 to 255
+At time 84 freed 128 bytes from 256 to 383
+At time 110 freed 256 bytes from 768 to 1023
